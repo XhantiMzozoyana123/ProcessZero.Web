@@ -68,7 +68,8 @@ namespace ProcessZero.Infrastructure.Services
                     Company = ll.Company ?? string.Empty,
                     Job = ll.Job ?? string.Empty,
                     Location = ll.Location ?? string.Empty,
-                    Industry = ll.Industry
+                    Industry = ll.Industry,
+                    Intent = ll.Intent,
                 };
 
                 entities.Add(entry);

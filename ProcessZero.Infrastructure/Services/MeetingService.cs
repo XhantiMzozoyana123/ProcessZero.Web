@@ -49,7 +49,7 @@ namespace ProcessZero.Infrastructure.Services
                 await _context.SaveChangesAsync(); // generates Id
 
                 // update KPI snapshot
-                await _kpiService.AddCallBookedAsync(meeting.UserId, meeting.ProductId);
+                await _kpiService.AddMeetingBookedAsync(meeting.UserId, meeting.ProductId);
 
                 await NotifyMeetingBookedAsync(meeting);
 

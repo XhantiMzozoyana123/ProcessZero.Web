@@ -343,6 +343,29 @@ namespace ProcessZero.Infrastructure.Services
                 // swallow email errors
             }
         }
-    }
 
+        public async Task<List<SubmissionResultDto>> GetAllMyResultsAsync(CancellationToken cancellationToken = default)
+        {
+            var userId = _httpContextAccessor.HttpContext?.User?
+                .FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return new List<SubmissionResultDto>();
+
+            var submissions = await _context.AssessmentSubmissions
+                .AsNoTracking()
+                .Where(s => s.UserId == userId)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            return submissions.Select(s => new SubmissionResultDto
+            {
+                ProductId = s.ProductId,
+                Score = s.Score,
+                Total = s.Total,
+                Percentage = s.Percentage,
+                Passed = s.Passed
+            }).ToList();
+        }
+    }
 }

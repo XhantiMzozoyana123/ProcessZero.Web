@@ -32,6 +32,13 @@ namespace ProcessZero.Application.Interfaces
         /// Admin: retrieve the raw assessment payload (including correct answers) for a product.
         /// Returns null if no assessment has been uploaded for the given productId.
         /// </summary>
+        /// 
+        /// <summary>
+        /// Get all assessments available to the client.
+        /// Returns an empty list if no assessments exist.
+        /// </summary>
+        Task<List<SubmissionResultDto>> GetAllMyResultsAsync(CancellationToken cancellationToken = default);
+
         Task<AssessmentDto?> GetAssessmentForAdminAsync(int productId, CancellationToken cancellationToken = default);
         /// <summary>
         /// Admin: retrieve the latest assessment for all products (including global) for management UI.

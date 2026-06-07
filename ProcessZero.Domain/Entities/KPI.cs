@@ -5,44 +5,38 @@ using System.Text;
 
 namespace ProcessZero.Domain.Entities
 {
+    /// <summary>
+    /// Daily performance snapshot for a sales rep on a given product.
+    /// One row is maintained per rep + product + day and updated as the rep
+    /// records their activity throughout the day.
+    /// </summary>
     public class KPI : BaseEntity
     {
         [Required]
         public int ProductId { get; set; }
 
-        // LEVEL 1 — Sales Partner
-        public int OutreachAttempts { get; set; } = 0;
-        public int CallsBooked { get; set; } = 0;
-        public int CallsAttended { get; set; } = 0;
-        public int DealsInfluenced { get; set; } = 0;
-        public decimal RevenueGenerated { get; set; } = 0;
+        // ── Daily sales rep activity ───────────────────────────────
+        // Number of call outreach attempts made for the day
+        public int CallOutreach { get; set; } = 0;
 
-        // LEVEL 2 — Senior Partner
-        public int DealsClosed { get; set; } = 0;
-        public int DealsAttempted { get; set; } = 0;
-        public decimal AverageDealSize { get; set; } = 0;
-        public decimal RevenueInfluenced { get; set; } = 0;
-        public double BasicClientRetention { get; set; } = 0;
-        public double ActivityConsistency { get; set; } = 0;
+        // Number of email outreach attempts made for the day
+        public int EmailOutreach { get; set; } = 0;
 
-        // LEVEL 3 — Network Leader
-        public int ActiveTeamSize { get; set; } = 0;
-        public decimal TeamRevenue { get; set; } = 0;
-        public double TeamCloseRate { get; set; } = 0;
-        public double TeamChurnRate { get; set; } = 0;
-        public double LeaderActivityLevel { get; set; } = 0;
+        // Number of calls actually made for the day
+        public int CallsMade { get; set; } = 0;
 
-        // LEVEL 4 & 5
+        // Number of meetings booked for the day
+        public int MeetingsBooked { get; set; } = 0;
+
+        // Total deal size (amount) closed for the day
+        public decimal DealSizeClosed { get; set; } = 0;
+
+        // ── MRR tracking (derived from Contacts + Invoices) ────────
+        // Number of active clients used to calculate MRR.
+        public int ActiveClients { get; set; } = 0;
+
+        // Monthly Recurring Revenue, recalculated from active clients and
+        // the amounts they have closed on every time KPIs are updated.
         public decimal MonthlyRecurringRevenue { get; set; } = 0;
-        public double GrowthRate { get; set; } = 0;
-        public double ClientRetention { get; set; } = 0;
-        public double TeamPerformanceHealth { get; set; } = 0;
-        public double BrandCompliance { get; set; } = 0;
-        public double LongTermRevenueGrowth { get; set; } = 0;
-        public int StrategicInitiativesDelivered { get; set; } = 0;
-        public double BrandRiskManagement { get; set; } = 0;
-        public double InnovationContribution { get; set; } = 0;
-        public double LeadershipStability { get; set; } = 0;
     }
-
 }

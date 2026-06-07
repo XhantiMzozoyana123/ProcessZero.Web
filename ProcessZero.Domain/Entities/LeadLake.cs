@@ -22,6 +22,8 @@ namespace ProcessZero.Domain.Entities
         public string Location { get; set; } = string.Empty;
 
         public LeadLakeIndustry Industry { get; set; }
+
+        public LeadIntent Intent { get; set; }  
     }
 
 
@@ -38,5 +40,12 @@ namespace ProcessZero.Domain.Entities
         Entertainment,
         Hospitality,
         Other
+    }
+
+    public enum LeadIntent
+    {
+        High,
+        Medium,
+        Low
     }
 }

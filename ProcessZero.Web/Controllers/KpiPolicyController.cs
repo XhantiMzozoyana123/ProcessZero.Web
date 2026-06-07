@@ -10,28 +10,19 @@ namespace ProcessZero.Web.Controllers
     /// Controller for managing KPI policies.
     ///
     /// Entities referenced:
-    /// - KpiPolicy (inherits BaseEntity)
+    /// - KpiPolicy (inherits BaseEntity) — defines the MRR target for a product/rep
     ///   - Id (int), UserId (string), CreatedAt (DateTime), UpdatedAt (DateTime)
     ///   - ProductId (int?)
     ///   - EffectiveFrom (DateTime), EffectiveTo (DateTime?)
     ///   - IsActive (bool)
-    ///   - MinMonthlyRevenue (decimal)
-    ///   - MinOutreachAttempts (int)
-    ///   - MinCallsBooked (int)
+    ///   - TargetMRR (decimal)
     ///   - GracePeriodDays (int), AutoFreezeOnBreach (bool)
     ///
-    /// - KPI (inherits BaseEntity) — snapshot of partner performance
+    /// - KPI (inherits BaseEntity) — daily snapshot of a sales rep's performance
     ///   - ProductId (int)
-    ///   - OutreachAttempts (int), CallsBooked (int), CallsAttended (int)
-    ///   - DealsInfluenced (int), RevenueGenerated (decimal)
-    ///   - DealsClosed (int), DealsAttempted (int), AverageDealSize (decimal)
-    ///   - RevenueInfluenced (decimal), BasicClientRetention (double)
-    ///   - ActivityConsistency (double), ActiveTeamSize (int), TeamRevenue (decimal)
-    ///   - TeamCloseRate (double), TeamChurnRate (double), LeaderActivityLevel (double)
-    ///   - MonthlyRecurringRevenue (decimal), GrowthRate (double), ClientRetention (double)
-    ///   - TeamPerformanceHealth (double), BrandCompliance (double)
-    ///   - LongTermRevenueGrowth (double), StrategicInitiativesDelivered (int)
-    ///   - BrandRiskManagement (double), InnovationContribution (double), LeadershipStability (double)
+    ///   - CallOutreach (int), EmailOutreach (int), CallsMade (int)
+    ///   - MeetingsBooked (int), DealSizeClosed (decimal)
+    ///   - ActiveClients (int), MonthlyRecurringRevenue (decimal)
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]

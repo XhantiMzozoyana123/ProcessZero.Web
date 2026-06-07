@@ -267,6 +267,7 @@ namespace ProcessZero.Domain.Migrations
                     Job = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Location = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Industry = table.Column<int>(type: "int", nullable: false),
+                    Intent = table.Column<int>(type: "int", nullable: false),
                     UserId = table.Column<string>(type: "nvarchar(450)", maxLength: 450, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
@@ -336,6 +337,96 @@ namespace ProcessZero.Domain.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Products", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayCampaigns",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    DailySendLimit = table.Column<int>(type: "int", nullable: false),
+                    StartDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    EndDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayCampaigns", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayEmailAccounts",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    EmailAddress = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    DisplayName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    AccessToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RefreshToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    TokenExpiry = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DailySendLimit = table.Column<int>(type: "int", nullable: false),
+                    SentToday = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    HealthStatus = table.Column<int>(type: "int", nullable: false),
+                    HealthCheckError = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    LastUsedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayEmailAccounts", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayLeads",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FirstName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LastName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Company = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    JobTitle = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Location = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Industry = table.Column<int>(type: "int", nullable: false),
+                    Intent = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayLeads", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Webinars",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    YoutubeUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ThumbnailBase64 = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Webinars", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -442,6 +533,235 @@ namespace ProcessZero.Domain.Migrations
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelaySequences",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RelayCampaignId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    MessageRotationEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    InboxRotationEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelaySequences", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RelaySequences_RelayCampaigns_RelayCampaignId",
+                        column: x => x.RelayCampaignId,
+                        principalTable: "RelayCampaigns",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayCampaignInboxes",
+                columns: table => new
+                {
+                    RelayCampaignId = table.Column<int>(type: "int", nullable: false),
+                    RelayInboxId = table.Column<int>(type: "int", nullable: false),
+                    Id = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayCampaignInboxes", x => new { x.RelayCampaignId, x.RelayInboxId });
+                    table.ForeignKey(
+                        name: "FK_RelayCampaignInboxes_RelayCampaigns_RelayCampaignId",
+                        column: x => x.RelayCampaignId,
+                        principalTable: "RelayCampaigns",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_RelayCampaignInboxes_RelayEmailAccounts_RelayInboxId",
+                        column: x => x.RelayInboxId,
+                        principalTable: "RelayEmailAccounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayEmailReplies",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RelayEmailAccountId = table.Column<int>(type: "int", nullable: false),
+                    LeadLakeId = table.Column<int>(type: "int", nullable: false),
+                    MessageId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FromEmail = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Subject = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Body = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ReceivedDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsRead = table.Column<bool>(type: "bit", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Tags = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayEmailReplies", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RelayEmailReplies_LeadLakes_LeadLakeId",
+                        column: x => x.LeadLakeId,
+                        principalTable: "LeadLakes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_RelayEmailReplies_RelayEmailAccounts_RelayEmailAccountId",
+                        column: x => x.RelayEmailAccountId,
+                        principalTable: "RelayEmailAccounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelaySequenceSteps",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RelaySequenceId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    StepOrder = table.Column<int>(type: "int", nullable: false),
+                    DelayDays = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelaySequenceSteps", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RelaySequenceSteps_RelaySequences_RelaySequenceId",
+                        column: x => x.RelaySequenceId,
+                        principalTable: "RelaySequences",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayCampaignLeads",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RelayCampaignId = table.Column<int>(type: "int", nullable: false),
+                    RelayLeadId = table.Column<int>(type: "int", nullable: false),
+                    CurrentSequenceStepId = table.Column<int>(type: "int", nullable: true),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    Replied = table.Column<bool>(type: "bit", nullable: false),
+                    Unsubscribed = table.Column<bool>(type: "bit", nullable: false),
+                    Completed = table.Column<bool>(type: "bit", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayCampaignLeads", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RelayCampaignLeads_RelayCampaigns_RelayCampaignId",
+                        column: x => x.RelayCampaignId,
+                        principalTable: "RelayCampaigns",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_RelayCampaignLeads_RelayLeads_RelayLeadId",
+                        column: x => x.RelayLeadId,
+                        principalTable: "RelayLeads",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_RelayCampaignLeads_RelaySequenceSteps_CurrentSequenceStepId",
+                        column: x => x.CurrentSequenceStepId,
+                        principalTable: "RelaySequenceSteps",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayEmailVariants",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    SequenceStepId = table.Column<int>(type: "int", nullable: false),
+                    VariantName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Subject = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    HtmlBody = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Weight = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayEmailVariants", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RelayEmailVariants_RelaySequenceSteps_SequenceStepId",
+                        column: x => x.SequenceStepId,
+                        principalTable: "RelaySequenceSteps",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RelayEmailActivities",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RelayCampaignId = table.Column<int>(type: "int", nullable: false),
+                    RelayLeadId = table.Column<int>(type: "int", nullable: false),
+                    RelayInboxId = table.Column<int>(type: "int", nullable: false),
+                    EmailVariantId = table.Column<int>(type: "int", nullable: false),
+                    GmailMessageId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    GmailThreadId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    SentAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    Replied = table.Column<bool>(type: "bit", nullable: false),
+                    RepliedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RelayEmailActivities", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RelayEmailActivities_RelayCampaigns_RelayCampaignId",
+                        column: x => x.RelayCampaignId,
+                        principalTable: "RelayCampaigns",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_RelayEmailActivities_RelayEmailAccounts_RelayInboxId",
+                        column: x => x.RelayInboxId,
+                        principalTable: "RelayEmailAccounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_RelayEmailActivities_RelayEmailVariants_EmailVariantId",
+                        column: x => x.EmailVariantId,
+                        principalTable: "RelayEmailVariants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_RelayEmailActivities_RelayLeads_RelayLeadId",
+                        column: x => x.RelayLeadId,
+                        principalTable: "RelayLeads",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(
@@ -596,6 +916,125 @@ namespace ProcessZero.Domain.Migrations
                 name: "IX_Payouts_UserId_Month_Year",
                 table: "Payouts",
                 columns: new[] { "UserId", "Month", "Year" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaignInboxes_RelayCampaignId",
+                table: "RelayCampaignInboxes",
+                column: "RelayCampaignId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaignInboxes_RelayInboxId",
+                table: "RelayCampaignInboxes",
+                column: "RelayInboxId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaignLeads_CurrentSequenceStepId",
+                table: "RelayCampaignLeads",
+                column: "CurrentSequenceStepId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaignLeads_RelayCampaignId",
+                table: "RelayCampaignLeads",
+                column: "RelayCampaignId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaignLeads_RelayCampaignId_RelayLeadId",
+                table: "RelayCampaignLeads",
+                columns: new[] { "RelayCampaignId", "RelayLeadId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaignLeads_RelayLeadId",
+                table: "RelayCampaignLeads",
+                column: "RelayLeadId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaignLeads_Status",
+                table: "RelayCampaignLeads",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayCampaigns_IsActive",
+                table: "RelayCampaigns",
+                column: "IsActive");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailAccounts_EmailAddress",
+                table: "RelayEmailAccounts",
+                column: "EmailAddress",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailAccounts_IsActive_SentToday",
+                table: "RelayEmailAccounts",
+                columns: new[] { "IsActive", "SentToday" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailActivities_EmailVariantId",
+                table: "RelayEmailActivities",
+                column: "EmailVariantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailActivities_GmailMessageId",
+                table: "RelayEmailActivities",
+                column: "GmailMessageId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailActivities_GmailThreadId",
+                table: "RelayEmailActivities",
+                column: "GmailThreadId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailActivities_RelayCampaignId",
+                table: "RelayEmailActivities",
+                column: "RelayCampaignId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailActivities_RelayInboxId_SentAt",
+                table: "RelayEmailActivities",
+                columns: new[] { "RelayInboxId", "SentAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailActivities_RelayLeadId_SentAt",
+                table: "RelayEmailActivities",
+                columns: new[] { "RelayLeadId", "SentAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailReplies_LeadLakeId",
+                table: "RelayEmailReplies",
+                column: "LeadLakeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailReplies_RelayEmailAccountId",
+                table: "RelayEmailReplies",
+                column: "RelayEmailAccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayEmailVariants_SequenceStepId",
+                table: "RelayEmailVariants",
+                column: "SequenceStepId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelayLeads_Email",
+                table: "RelayLeads",
+                column: "Email",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelaySequences_RelayCampaignId",
+                table: "RelaySequences",
+                column: "RelayCampaignId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelaySequenceSteps_RelaySequenceId",
+                table: "RelaySequenceSteps",
+                column: "RelaySequenceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RelaySequenceSteps_StepOrder",
+                table: "RelaySequenceSteps",
+                column: "StepOrder");
         }
 
         /// <inheritdoc />
@@ -641,9 +1080,6 @@ namespace ProcessZero.Domain.Migrations
                 name: "KPIs");
 
             migrationBuilder.DropTable(
-                name: "LeadLakes");
-
-            migrationBuilder.DropTable(
                 name: "Meetings");
 
             migrationBuilder.DropTable(
@@ -653,10 +1089,46 @@ namespace ProcessZero.Domain.Migrations
                 name: "Products");
 
             migrationBuilder.DropTable(
+                name: "RelayCampaignInboxes");
+
+            migrationBuilder.DropTable(
+                name: "RelayCampaignLeads");
+
+            migrationBuilder.DropTable(
+                name: "RelayEmailActivities");
+
+            migrationBuilder.DropTable(
+                name: "RelayEmailReplies");
+
+            migrationBuilder.DropTable(
+                name: "Webinars");
+
+            migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "RelayEmailVariants");
+
+            migrationBuilder.DropTable(
+                name: "RelayLeads");
+
+            migrationBuilder.DropTable(
+                name: "LeadLakes");
+
+            migrationBuilder.DropTable(
+                name: "RelayEmailAccounts");
+
+            migrationBuilder.DropTable(
+                name: "RelaySequenceSteps");
+
+            migrationBuilder.DropTable(
+                name: "RelaySequences");
+
+            migrationBuilder.DropTable(
+                name: "RelayCampaigns");
         }
     }
 }

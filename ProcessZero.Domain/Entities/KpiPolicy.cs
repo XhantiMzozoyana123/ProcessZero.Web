@@ -4,11 +4,13 @@ using System.Text;
 
 namespace ProcessZero.Domain.Entities
 {
+    /// <summary>
+    /// Defines the MRR target a sales rep (or product) is expected to reach.
+    /// MRR is calculated from active client contacts and their closed invoice
+    /// amounts, and is compared against <see cref="TargetMRR"/>.
+    /// </summary>
     public class KpiPolicy : BaseEntity
     {
-        // Simplified KPI policy used for platform-wide thresholds.
-        // Keep only the most important fields for clarity and maintenance.
-
         // Which product this policy applies to (null = all products)
         public int? ProductId { get; set; }
 
@@ -17,13 +19,8 @@ namespace ProcessZero.Domain.Entities
         public DateTime? EffectiveTo { get; set; }
         public bool IsActive { get; set; } = true;
 
-        // Key thresholds
-        public decimal MinMonthlyRevenue { get; set; }
-        // Minimum required outreach attempts in the period (e.g. day/week/month)
-        public int MinOutreachAttempts { get; set; } = 0;
-
-        // Minimum calls booked in the period
-        public int MinCallsBooked { get; set; } = 0;
+        // The Monthly Recurring Revenue target for the period.
+        public decimal TargetMRR { get; set; }
 
         // Consequence flags
         public int GracePeriodDays { get; set; }

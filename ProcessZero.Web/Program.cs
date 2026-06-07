@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ProcessZero.Application.Interfaces;
+using ProcessZero.Application.Options;
 using ProcessZero.Domain;
 using ProcessZero.Infrastructure.Filters;
 using ProcessZero.Infrastructure.Services;
@@ -91,6 +92,12 @@ builder.Services.AddAuthorization(options =>
 // Infrastructure services are referenced above
 
 // -----------------------------
+// CONFIGURATION OPTIONS
+// -----------------------------
+builder.Services.Configure<GoogleOAuthOptions>(
+    builder.Configuration.GetSection("GoogleOAuth"));
+
+// -----------------------------
 // CORE SERVICES
 // -----------------------------
 builder.Services.AddMemoryCache();
@@ -112,9 +119,46 @@ builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<IInboxService, InboxService>();
+builder.Services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
+builder.Services.AddScoped<IGmailService, GmailService>();
+builder.Services.AddScoped<IRelayCampaignService, RelayCampaignService>();
+builder.Services.AddScoped<IRelayLeadService, RelayLeadService>();
+builder.Services.AddScoped<IRelayInboxService, RelayInboxService>();
+builder.Services.AddScoped<IRelayService, RelayService>();
+// Relay engine services (previously unregistered) — required so the
+// campaign scheduler/sequence engine can resolve them and actually send.
+builder.Services.AddScoped<IRelaySequenceService, RelaySequenceService>();
+builder.Services.AddScoped<IRelayInboxRotationService, RelayInboxRotationService>();
+builder.Services.AddScoped<IRelayEmailTrackingService, RelayEmailTrackingService>();
+builder.Services.AddScoped<IRelayA_BTestingService, RelayA_BTestingService>();
+builder.Services.AddScoped<IRelayEmailSenderService, RelayEmailSenderService>();
+
+builder.Services.AddScoped<IImportStatusService, InMemoryImportStatusService>();
+builder.Services.AddScoped<IWebinarService, WebinarService>();
+builder.Services.AddScoped<ImportProcessor>();
+builder.Services.AddScoped<IExtractService>(provider =>
+{
+    var context = provider.GetRequiredService<ApplicationDbContext>();
+    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+    var httpClient = httpClientFactory.CreateClient();
+    return new ExtractService(context, httpClient);
+});
+
+/*
+ IRelayCampaignService campaignService,
+            IRelayLeadService leadService,
+            IImportStatusService statusService
+ */
+
 // Background email worker and enqueuer: use Hangfire to send emails outside HTTP requests
 builder.Services.AddScoped<IBackgroundEmailWorker, BackgroundEmailWorker>();
 builder.Services.AddSingleton<IBackgroundEmailService, BackgroundEmailService>();
+
+// Relay campaign scheduler (Hangfire recurring jobs)
+builder.Services.AddScoped<RelayCampaignBackgroundService>();
+
+// ============== WORKSHOP / WEBINAR SERVICES ==============
+// Workshop system removed per request
 
 // CORS - Allow all origins
 builder.Services.AddCors(options =>
@@ -221,5 +265,20 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+// Start relay campaign scheduler (register recurring Hangfire jobs)
+_ = Task.Run(async () =>
+{
+    await Task.Delay(1000);
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var scheduler = scope.ServiceProvider.GetRequiredService<RelayCampaignBackgroundService>();
+        scheduler.Start();
+    }
+    catch
+    {
+        // Do not let scheduler failures block startup
+    }
+});
 
 app.Run();

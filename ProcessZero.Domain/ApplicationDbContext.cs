@@ -22,12 +22,12 @@ namespace ProcessZero.Domain
 
         private static DbContextOptions<ApplicationDbContext> DesignTimeDbContextOptions()
         {
-            // Build the path to the PetGroomer.Api project
-            var webProjectPath = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "ProcessZero.Api");
+            // Build the path to the ProcessZero.Web project
+            var webProjectPath = Path.Combine(Directory.GetParent(Directory.GetCurrentDirectory()).FullName, "ProcessZero.Web");
 
-            // Load the configuration from appsettings.json in the .Api project
+            // Load the configuration from appsettings.json in the Web project
             IConfigurationRoot configuration = new ConfigurationBuilder()
-                .SetBasePath(webProjectPath) // Set the base path to the .Api directory
+                .SetBasePath(webProjectPath) // Set the base path to the Web directory
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true) // Load appsettings.json
                 .Build();
 
@@ -43,6 +43,8 @@ namespace ProcessZero.Domain
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Workshop configurations removed
 
             // ──────────────────────────────────────────────────────────
             // Column length constraints (required for indexing nvarchar)
@@ -84,7 +86,7 @@ namespace ProcessZero.Domain
             });
 
             // Meetings — UserId
-            modelBuilder.Entity<Meeting>(e =>
+            modelBuilder.Entity<Meeting>(e => 
             {
                 e.Property(m => m.UserId).HasMaxLength(450);
             });
@@ -213,6 +215,126 @@ namespace ProcessZero.Domain
             {
                 e.HasIndex(u => u.IsBanned).HasDatabaseName("IX_AspNetUsers_IsBanned");
             });
+
+
+            // ──────────────────────────────────────────────────────────
+            // RELAY EMAIL SYSTEM
+            // ──────────────────────────────────────────────────────────
+
+            modelBuilder.Entity<RelayCampaign>(e =>
+            {
+                e.HasIndex(x => x.IsActive);
+            });
+
+            modelBuilder.Entity<RelaySequence>(e =>
+            {
+                e.HasOne(x => x.RelayCampaign)
+                    .WithMany(x => x.Sequences)
+                    .HasForeignKey(x => x.RelayCampaignId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(x => x.RelayCampaignId);
+            });
+
+            modelBuilder.Entity<RelaySequenceStep>(e =>
+            {
+                e.HasOne(x => x.RelaySequence)
+                    .WithMany(x => x.Steps)
+                    .HasForeignKey(x => x.RelaySequenceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(x => x.RelaySequenceId);
+                e.HasIndex(x => x.StepOrder);
+            });
+
+            modelBuilder.Entity<RelayEmailVariant>(e =>
+            {
+                e.HasOne(x => x.SequenceStep)
+                    .WithMany(x => x.Variants)
+                    .HasForeignKey(x => x.SequenceStepId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(x => x.SequenceStepId);
+            });
+
+            modelBuilder.Entity<RelayCampaignInbox>(e =>
+            {
+                e.HasKey(x => new { x.RelayCampaignId, x.RelayInboxId });
+
+                e.HasOne(x => x.RelayCampaign)
+                    .WithMany(x => x.Inboxes)
+                    .HasForeignKey(x => x.RelayCampaignId);
+
+                e.HasOne(x => x.RelayInbox)
+                    .WithMany(x => x.Campaigns)
+                    .HasForeignKey(x => x.RelayInboxId);
+
+                e.HasIndex(x => x.RelayCampaignId);
+            });
+
+            modelBuilder.Entity<RelayCampaignLead>(e =>
+            {
+                e.HasIndex(x => new { x.RelayCampaignId, x.RelayLeadId }).IsUnique();
+
+                e.HasIndex(x => x.RelayCampaignId);
+                e.HasIndex(x => x.RelayLeadId);
+                e.HasIndex(x => x.Status);
+
+                e.HasOne(x => x.RelayCampaign)
+                    .WithMany(x => x.Leads)
+                    .HasForeignKey(x => x.RelayCampaignId);
+
+                e.HasOne(x => x.RelayLead)
+                    .WithMany(x => x.Campaigns)
+                    .HasForeignKey(x => x.RelayLeadId);
+            });
+
+            modelBuilder.Entity<RelayEmailActivity>(e =>
+            {
+                e.HasIndex(x => x.GmailMessageId).IsUnique();
+                e.HasIndex(x => x.GmailThreadId);
+
+                e.HasIndex(x => new { x.RelayLeadId, x.SentAt });
+                e.HasIndex(x => new { x.RelayInboxId, x.SentAt });
+                e.HasIndex(x => x.EmailVariantId);
+                e.HasIndex(x => x.RelayCampaignId);
+
+                // Break multiple cascade paths: RelayEmailActivity is reachable
+                // from RelayCampaign both directly and via
+                // RelayEmailVariant -> SequenceStep -> Sequence -> Campaign.
+                // Use Restrict (NO ACTION) on these FKs to avoid SQL Server
+                // "may cause cycles or multiple cascade paths" error.
+                e.HasOne(x => x.RelayCampaign)
+                    .WithMany()
+                    .HasForeignKey(x => x.RelayCampaignId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(x => x.RelayLead)
+                    .WithMany(x => x.Activities)
+                    .HasForeignKey(x => x.RelayLeadId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(x => x.RelayInbox)
+                    .WithMany(x => x.Activities)
+                    .HasForeignKey(x => x.RelayInboxId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(x => x.EmailVariant)
+                    .WithMany(x => x.Activities)
+                    .HasForeignKey(x => x.EmailVariantId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<RelayLead>(e =>
+            {
+                e.HasIndex(x => x.Email).IsUnique();
+            });
+
+            modelBuilder.Entity<RelayEmailAccount>(e =>
+            {
+                e.HasIndex(x => x.EmailAddress).IsUnique();
+                e.HasIndex(x => new { x.IsActive, x.SentToday });
+            });
         }
 
         public DbSet<KPI> KPIs { get; set; }
@@ -238,5 +360,21 @@ namespace ProcessZero.Domain
         public DbSet<AssessmentSubmission> AssessmentSubmissions { get; set; }
 
         public DbSet<Assessment> Assessments { get; set; }
+
+        public DbSet<RelayEmailAccount> RelayEmailAccounts { get; set; }
+
+        public DbSet<RelayEmailReply> RelayEmailReplies { get; set; }
+
+        public DbSet<Webinar> Webinars { get; set; }
+
+        // RELAY SYSTEM
+        public DbSet<RelayCampaign> RelayCampaigns { get; set; }
+        public DbSet<RelaySequence> RelaySequences { get; set; }
+        public DbSet<RelaySequenceStep> RelaySequenceSteps { get; set; }
+        public DbSet<RelayEmailVariant> RelayEmailVariants { get; set; }
+        public DbSet<RelayCampaignInbox> RelayCampaignInboxes { get; set; }
+        public DbSet<RelayCampaignLead> RelayCampaignLeads { get; set; }
+        public DbSet<RelayLead> RelayLeads { get; set; }
+        public DbSet<RelayEmailActivity> RelayEmailActivities { get; set; }
     }
 }
