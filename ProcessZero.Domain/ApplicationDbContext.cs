@@ -34,10 +34,15 @@ namespace ProcessZero.Domain
             var builder = new DbContextOptionsBuilder<ApplicationDbContext>();
             var connectionString = configuration.GetConnectionString("DefaultConnection");
 
-            // Choose the appropriate database provider here
-            builder.UseSqlServer(connectionString); // Or UseSqlite, UseNpgsql, etc.
+            // Choose the appropriate database provider here.
+            // A pinned server version is used so design-time tooling (e.g.
+            // `dotnet ef migrations add`) does not require a live MySQL
+            // connection. Adjust the version to match your MySQL server.
+            builder.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 36)));
 
             return builder.Options;
+
+
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

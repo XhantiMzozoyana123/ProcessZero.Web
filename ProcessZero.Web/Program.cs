@@ -1,5 +1,7 @@
 using Hangfire;
+using Hangfire.MySql;
 using Microsoft.AspNetCore.Identity;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ProcessZero.Application.Interfaces;
@@ -23,8 +25,9 @@ builder.Configuration
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    options.UseSqlServer(connectionString);
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 });
+
 
 // -----------------------------
 // HANGFIRE (FIXED)
@@ -34,8 +37,14 @@ builder.Services.AddHangfire(config =>
     config.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
           .UseSimpleAssemblyNameTypeSerializer()
           .UseRecommendedSerializerSettings()
-          .UseSqlServerStorage(builder.Configuration.GetConnectionString("DefaultConnection"));
+          .UseStorage(new MySqlStorage(
+              builder.Configuration.GetConnectionString("DefaultConnection"),
+              new MySqlStorageOptions
+              {
+                  TablesPrefix = "Hangfire"
+              }));
 });
+
 
 builder.Services.AddHangfireServer(options =>
 {
