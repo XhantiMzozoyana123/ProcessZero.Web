@@ -130,16 +130,14 @@ builder.Services.AddScoped<IRelayEmailTrackingService, RelayEmailTrackingService
 builder.Services.AddScoped<IRelayA_BTestingService, RelayA_BTestingService>();
 builder.Services.AddScoped<IRelayEmailSenderService, RelayEmailSenderService>();
 
+// LLM Service
+builder.Services.AddHttpClient<ILLMService, LLMService>();
+
 // Support Services
 builder.Services.AddScoped<IImportStatusService, InMemoryImportStatusService>();
 builder.Services.AddScoped<IWebinarService, WebinarService>();
 builder.Services.AddScoped<ImportProcessor>();
-builder.Services.AddScoped<IExtractService>(provider =>
-{
-    var context = provider.GetRequiredService<ApplicationDbContext>();
-    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
-    return new ExtractService(context, httpClientFactory.CreateClient());
-});
+builder.Services.AddScoped<IExtractService, ExtractService>();
 
 // Background Tasks
 builder.Services.AddScoped<IBackgroundEmailWorker, BackgroundEmailWorker>();

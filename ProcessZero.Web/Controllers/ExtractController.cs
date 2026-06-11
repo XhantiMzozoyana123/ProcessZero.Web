@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using ProcessZero.Domain.Entities;
 using System.Threading.Tasks;
@@ -26,6 +27,17 @@ namespace ProcessZero.Web.Controllers
     /// Workflow:
     ///   Admin → POST /api/extract/scrape → Yellow Pages search → Parse business details → 
     ///   Infer industry/job → Check for duplicates → Save to database → Return results
+    ///   
+    /// 
+    /// SearchDto fields:
+    ///      public class SearchDto
+    //    {
+    //        public string Keywords { get; set; } = string.Empty;
+
+    //    public int PageViewLimit { get; set; }
+
+    //    public string ContainerUrl { get; set; } = string.Empty;
+    //}
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
@@ -33,93 +45,58 @@ namespace ProcessZero.Web.Controllers
     public class ExtractController : ControllerBase
     {
         private readonly IExtractService _extractService;
-        private readonly ILogger<ExtractController> _logger;
 
-        public ExtractController(IExtractService extractService, ILogger<ExtractController> logger)
+        public ExtractController(IExtractService extractService)
         {
             _extractService = extractService;
-            _logger = logger;
         }
 
-        /// <summary>
-        /// Scrapes business leads from Yellow Pages based on keyword and location.
-        /// Extracts: name, email, phone, location, job title, and inferred industry.
-        /// Automatically saves new leads to the database and skips duplicates.
-        /// </summary>
-        /// <param name="keyword">Search term (e.g., "software developer", "accountant")</param>
-        /// <param name="location">Geographic location (e.g., "New York", "San Francisco")</param>
-        /// <param name="pages">Number of result pages to scrape (default: 1, max: 5)</param>
-        /// <response code="200">Scraping successful; returns list of leads (newly saved and skipped duplicates)</response>
-        /// <response code="400">Invalid input parameters</response>
-        /// <response code="401">User not authenticated or not admin</response>
-        /// <response code="500">Scraping error or database save failure</response>
-        [HttpPost("scrape")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> ScrapeLeads(
-            [FromQuery] string keyword,
-            [FromQuery] string location,
-            [FromQuery] int pages = 1,
-            CancellationToken cancellationToken = default)
+        // -----------------------------------------
+        // 🔥 BATCH EXTRACTION (MAIN PIPELINE)
+        // -----------------------------------------
+        [HttpPost("batch")]
+        public IActionResult BatchExtract([FromBody] List<SearchDto> batch)
         {
-            try
+            if (batch == null || batch.Count == 0)
+                return BadRequest("Batch cannot be empty");
+
+            _extractService.BatchExtraction(batch);
+
+            return Ok(new
             {
-                // Validate input
-                if (string.IsNullOrWhiteSpace(keyword))
-                    return BadRequest("Keyword cannot be empty");
-
-                if (string.IsNullOrWhiteSpace(location))
-                    return BadRequest("Location cannot be empty");
-
-                // Constrain pages to reasonable limits
-                if (pages < 1 || pages > 5)
-                    pages = 1;
-
-                _logger.LogInformation($"Starting scrape: keyword='{keyword}', location='{location}', pages={pages}");
-
-                // Scrape and save leads
-                var leads = await _extractService.ScrapeAsync(keyword, location, pages);
-
-                if (leads == null || leads.Count == 0)
-                {
-                    _logger.LogWarning($"No leads found for keyword='{keyword}', location='{location}'");
-                    return Ok(new { message = "No leads found", leads = new List<LeadLake>() });
-                }
-
-                _logger.LogInformation($"Successfully scraped {leads.Count} leads");
-
-                return Ok(new
-                {
-                    message = $"Successfully scraped {leads.Count} leads",
-                    leads = leads
-                });
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, "Network error during scraping");
-                return StatusCode(StatusCodes.Status500InternalServerError, 
-                    $"Network error: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during scraping");
-                return StatusCode(StatusCodes.Status500InternalServerError, 
-                    $"Error during scraping: {ex.Message}");
-            }
+                message = "Batch extraction started successfully",
+                count = batch.Count
+            });
         }
 
-        /// <summary>
-        /// Health check endpoint for the extract service.
-        /// </summary>
-        /// <response code="200">Service is operational</response>
+        // -----------------------------------------
+        // ⚡ SINGLE PIPELINE RUN
+        // -----------------------------------------
+        [HttpPost("run")]
+        public async Task<IActionResult> Run([FromBody] SearchDto searchDto)
+        {
+            if (searchDto == null)
+                return BadRequest("Invalid request");
+
+            await _extractService.InitializeExtraction(searchDto);
+
+            return Ok(new
+            {
+                message = "Extraction completed"
+            });
+        }
+
+        // -----------------------------------------
+        // 🧪 TEST ENDPOINT (DEBUG ONLY)
+        // -----------------------------------------
         [HttpGet("health")]
-        [AllowAnonymous]
-        [ProducesResponseType(StatusCodes.Status200OK)]
         public IActionResult Health()
         {
-            return Ok(new { status = "healthy", service = "ExtractService" });
+            return Ok(new
+            {
+                status = "Extract API is running",
+                time = DateTime.UtcNow
+            });
         }
     }
 }

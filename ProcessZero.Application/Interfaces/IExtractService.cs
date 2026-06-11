@@ -10,6 +10,8 @@ namespace ProcessZero.Application.Interfaces
 {
     public interface IExtractService
     {
+        Task InitializeExtraction(SearchDto searchDto);
 
+        void BatchExtraction(List<SearchDto> batchSearchDtos);
     }
 }
