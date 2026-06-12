@@ -91,6 +91,7 @@ namespace ProcessZero.Web.Controllers
         // 🧪 TEST ENDPOINT (DEBUG ONLY)
         // -----------------------------------------
         [HttpGet("health")]
+        [AllowAnonymous]
         public IActionResult Health()
         {
             return Ok(new

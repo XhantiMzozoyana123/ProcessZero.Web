@@ -132,6 +132,7 @@ builder.Services.AddScoped<IRelayEmailSenderService, RelayEmailSenderService>();
 
 // LLM Service
 builder.Services.AddHttpClient<ILLMService, LLMService>();
+builder.Services.AddScoped<IAIExtractorService, AIExtractorService>();
 
 // Support Services
 builder.Services.AddScoped<IImportStatusService, InMemoryImportStatusService>();
