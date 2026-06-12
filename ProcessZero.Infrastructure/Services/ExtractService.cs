@@ -44,6 +44,7 @@ namespace ProcessZero.Infrastructure.Services
                     ContainerUrl = item.ContainerUrl
                 };
 
+                // Run the scrapper...
                 InitializeExtraction(searchDto);
             }
         }
