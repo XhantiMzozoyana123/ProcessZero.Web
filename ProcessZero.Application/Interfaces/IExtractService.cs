@@ -12,6 +12,6 @@ namespace ProcessZero.Application.Interfaces
     {
         Task InitializeExtraction(SearchDto searchDto);
 
-        void BatchExtraction(List<SearchDto> batchSearchDtos);
+        Task BatchExtraction(List<SearchDto> batchSearchDtos);
     }
 }

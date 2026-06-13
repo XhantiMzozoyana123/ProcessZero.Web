@@ -79,7 +79,7 @@ namespace ProcessZero.Web.Controllers
             if (searchDto == null)
                 return BadRequest("Invalid request");
 
-            await _extractService.InitializeExtraction(searchDto);
+            _extractService.InitializeExtraction(searchDto);
 
             return Ok(new
             {

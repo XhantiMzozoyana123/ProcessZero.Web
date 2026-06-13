@@ -3,6 +3,7 @@ using Hangfire.MySql;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using ProcessZero.Application.Options;
 using ProcessZero.Domain;
@@ -14,15 +15,25 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // -----------------------------
-// CONFIGURATION & DATABASE
+// CONFIGURATION
 // -----------------------------
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// -----------------------------
+// DATABASE (EF CORE) & FACTORY
+// -----------------------------
+// We use AddDbContextFactory which registers the factory and options as SINGLETON.
+// This is required for long-running background jobs.
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
 {
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 });
+
+// We then register the DbContext as SCOPED by resolving it from the factory.
+// This allows Identity and Scoped services to work without scope-mismatch errors.
+builder.Services.AddScoped(sp =>
+    sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
 // -----------------------------
 // HANGFIRE
@@ -40,7 +51,7 @@ builder.Services.AddHangfire(config =>
 
 builder.Services.AddHangfireServer(options =>
 {
-    options.WorkerCount = 1; // Single worker for sequential processing if needed
+    options.WorkerCount = Environment.ProcessorCount;
 });
 
 // -----------------------------
@@ -59,16 +70,23 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 // -----------------------------
-// JWT AUTHENTICATION
+// JWT AUTH
 // -----------------------------
-var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Missing Jwt:Key");
-var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("Missing Jwt:Issuer");
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? throw new InvalidOperationException("Missing Jwt:Audience");
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("Missing Jwt:Key");
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? throw new InvalidOperationException("Missing Jwt:Issuer");
+
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? throw new InvalidOperationException("Missing Jwt:Audience");
 
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = "JwtBearer";
     options.DefaultChallengeScheme = "JwtBearer";
+    options.DefaultSignInScheme = "Identity.Application";
+    options.DefaultSignOutScheme = "Identity.Application";
 })
 .AddJwtBearer("JwtBearer", options =>
 {
@@ -85,6 +103,31 @@ builder.Services.AddAuthentication(options =>
         RoleClaimType = ClaimTypes.Role,
         ClockSkew = TimeSpan.Zero
     };
+
+    // Suppress the redirect challenge for API requests.
+    // Without this, Identity's cookie middleware issues a 302 redirect
+    // to /Account/Login when an API call lacks a valid JWT token.
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+    {
+        OnChallenge = context =>
+        {
+            // Only suppress the default challenge behavior for API routes
+            // (requests that expect JSON responses).
+            if (context.Request.Headers.Accept.Contains("application/json"))
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+                var body = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    error = "Unauthorized",
+                    message = "A valid JWT token is required."
+                });
+                return context.Response.WriteAsync(body);
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddAuthorization(options =>
@@ -93,14 +136,18 @@ builder.Services.AddAuthorization(options =>
 });
 
 // -----------------------------
-// CORE & INFRASTRUCTURE SERVICES
+// CORE SERVICES
 // -----------------------------
-builder.Services.Configure<GoogleOAuthOptions>(builder.Configuration.GetSection("GoogleOAuth"));
+builder.Services.Configure<GoogleOAuthOptions>(
+    builder.Configuration.GetSection("GoogleOAuth"));
+
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 
-// Application Services
+// -----------------------------
+// APPLICATION SERVICES
+// -----------------------------
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IKpiService, KpiService>();
 builder.Services.AddScoped<IKpiPolicyService, KpiPolicyService>();
@@ -119,7 +166,9 @@ builder.Services.AddScoped<IInboxService, InboxService>();
 builder.Services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
 builder.Services.AddScoped<IGmailService, GmailService>();
 
-// Relay Engine Services
+// -----------------------------
+// RELAY ENGINE
+// -----------------------------
 builder.Services.AddScoped<IRelayCampaignService, RelayCampaignService>();
 builder.Services.AddScoped<IRelayLeadService, RelayLeadService>();
 builder.Services.AddScoped<IRelayInboxService, RelayInboxService>();
@@ -130,24 +179,36 @@ builder.Services.AddScoped<IRelayEmailTrackingService, RelayEmailTrackingService
 builder.Services.AddScoped<IRelayA_BTestingService, RelayA_BTestingService>();
 builder.Services.AddScoped<IRelayEmailSenderService, RelayEmailSenderService>();
 
-// LLM Service
+// -----------------------------
+// LLM / AI
+// -----------------------------
 builder.Services.AddHttpClient<ILLMService, LLMService>();
 builder.Services.AddScoped<IAIExtractorService, AIExtractorService>();
 
-// Support Services
+// -----------------------------
+// SUPPORT SERVICES
+// -----------------------------
 builder.Services.AddScoped<IImportStatusService, InMemoryImportStatusService>();
 builder.Services.AddScoped<IWebinarService, WebinarService>();
 builder.Services.AddScoped<ImportProcessor>();
 builder.Services.AddScoped<IExtractService, ExtractService>();
 
-// Background Tasks
+// -----------------------------
+// BACKGROUND SERVICES
+// -----------------------------
 builder.Services.AddScoped<IBackgroundEmailWorker, BackgroundEmailWorker>();
 builder.Services.AddSingleton<IBackgroundEmailService, BackgroundEmailService>();
 builder.Services.AddScoped<RelayCampaignBackgroundService>();
 
+// -----------------------------
+// CORS
+// -----------------------------
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+    options.AddDefaultPolicy(p =>
+        p.AllowAnyOrigin()
+         .AllowAnyHeader()
+         .AllowAnyMethod());
 });
 
 builder.Services.AddControllersWithViews();
@@ -155,7 +216,7 @@ builder.Services.AddControllersWithViews();
 var app = builder.Build();
 
 // -----------------------------
-// HTTP PIPELINE
+// PIPELINE
 // -----------------------------
 if (!app.Environment.IsDevelopment())
 {
@@ -165,6 +226,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
 app.UseRouting();
 
 app.UseCors();
@@ -172,50 +234,50 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Hangfire Dashboard (Secured)
+// -----------------------------
+// HANGFIRE DASHBOARD
+// -----------------------------
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
     Authorization = new[] { new HangfireAuthorizationFilter() }
 });
 
-app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}");
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 // -----------------------------
-// INITIALIZATION (Seeding & Recurring Jobs)
+// STARTUP INIT
 // -----------------------------
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+
     try
     {
-        // 1. Seed Admin User
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+
         await SeedAdminUser(userManager, roleManager);
 
-        // 2. Start Relay Scheduler (Register Hangfire Jobs)
         var scheduler = services.GetRequiredService<RelayCampaignBackgroundService>();
         scheduler.Start();
-
-        // 3. Register Monthly Payroll Job (Example)
-        // RecurringJob.AddOrUpdate<IPayrollService>(
-        //    "generate-monthly-commissions",
-        //    svc => svc.GenerateMonthlyCommissionsReportAsync(),
-        //    Cron.Monthly());
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred during startup initialization.");
+        logger.LogError(ex, "Startup initialization failed");
     }
 }
 
 app.Run();
 
 // -----------------------------
-// HELPERS
+// SEED ADMIN
 // -----------------------------
-async Task SeedAdminUser(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+async Task SeedAdminUser(
+    UserManager<ApplicationUser> userManager,
+    RoleManager<IdentityRole> roleManager)
 {
     var email = "admin@processzero.xyz";
     var password = "StrongP@ssword123";
@@ -224,11 +286,20 @@ async Task SeedAdminUser(UserManager<ApplicationUser> userManager, RoleManager<I
         await roleManager.CreateAsync(new IdentityRole("Admin"));
 
     var user = await userManager.FindByEmailAsync(email);
+
     if (user == null)
     {
-        user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true };
+        user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true
+        };
+
         var result = await userManager.CreateAsync(user, password);
-        if (result.Succeeded) await userManager.AddToRoleAsync(user, "Admin");
+
+        if (result.Succeeded)
+            await userManager.AddToRoleAsync(user, "Admin");
     }
     else if (!await userManager.IsInRoleAsync(user, "Admin"))
     {

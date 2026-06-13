@@ -203,5 +203,88 @@ namespace ProcessZero.Web.Controllers
 
             return Ok(new { added = leadLakes.Count });
         }
+
+        /// <summary>
+        /// Creates a single lead. Admin access required.
+        /// </summary>
+        /// <param name="leadLake">The LeadLake entity to create. UserId is auto-assigned to the authenticated admin.</param>
+        /// <returns>The created LeadLake entity</returns>
+        /// <response code="201">Lead created successfully</response>
+        /// <response code="400">Invalid request</response>
+        /// <response code="401">User not authenticated</response>
+        /// <response code="403">User lacks Admin role</response>
+        [HttpPost]
+        [Authorize(Policy = "Admin")]
+        public async Task<IActionResult> Create([FromBody] LeadLake leadLake)
+        {
+            if (leadLake == null)
+                return BadRequest(new { error = "Lead is required." });
+
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized();
+
+            leadLake.UserId = userId;
+            await _leadLakeService.AddLeadLakeAsync(leadLake);
+
+            return CreatedAtAction(nameof(GetById), new { id = leadLake.Id }, leadLake);
+        }
+
+        /// <summary>
+        /// Updates an existing lead. Admin access required.
+        /// </summary>
+        /// <param name="id">The unique identifier of the lead to update</param>
+        /// <param name="leadLake">The LeadLake entity with updated values</param>
+        /// <returns>No content on success</returns>
+        /// <response code="204">Lead updated successfully</response>
+        /// <response code="400">Invalid request or id mismatch</response>
+        /// <response code="401">User not authenticated</response>
+        /// <response code="403">User lacks Admin role</response>
+        /// <response code="404">Lead not found</response>
+        [HttpPut("{id:int}")]
+        [Authorize(Policy = "Admin")]
+        public async Task<IActionResult> Update(int id, [FromBody] LeadLake leadLake)
+        {
+            if (leadLake == null)
+                return BadRequest(new { error = "Lead is required." });
+
+            if (leadLake.Id != id)
+                return BadRequest(new { error = "Id mismatch." });
+
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                await _leadLakeService.UpdateLeadLakeAsync(leadLake);
+            }
+            catch (InvalidOperationException)
+            {
+                return NotFound();
+            }
+
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Deletes a lead by its ID. Admin access required.
+        /// </summary>
+        /// <param name="id">The unique identifier of the lead to delete</param>
+        /// <returns>No content on success</returns>
+        /// <response code="204">Lead deleted successfully</response>
+        /// <response code="401">User not authenticated</response>
+        /// <response code="403">User lacks Admin role</response>
+        [HttpDelete("{id:int}")]
+        [Authorize(Policy = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _leadLakeService.DeleteLeadLakeAsync(id);
+            return NoContent();
+        }
     }
 }
+
+

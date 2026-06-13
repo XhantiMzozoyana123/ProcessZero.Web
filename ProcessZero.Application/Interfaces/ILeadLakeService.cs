@@ -13,5 +13,13 @@ namespace ProcessZero.Application.Interfaces
 
         // Adds multiple LeadLake entries in a single batch
         Task AddBatchLeadLakesAsync(List<LeadLake> leadLakes);
+
+        // Admin CRUD operations
+        Task AddLeadLakeAsync(LeadLake leadLake);
+
+        Task UpdateLeadLakeAsync(LeadLake leadLake);
+
+        Task DeleteLeadLakeAsync(int id);
     }
+
 }
