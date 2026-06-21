@@ -190,6 +190,7 @@ namespace ProcessZero.Infrastructure.Services
 
                 _context.AssessmentSubmissions.Add(entity);
                 await _context.SaveChangesAsync(cancellationToken);
+                
                 // Notify user if they passed
                 if (passed && !string.IsNullOrWhiteSpace(userId))
                 {
@@ -211,8 +212,15 @@ namespace ProcessZero.Infrastructure.Services
                             score,
                             total,
                             percent);
+                        
+                        var notice2 = ProcessZero.Application.Constants.NoticeConstant.NotifyBookMeetingWithTrainer(
+                            user?.UserName ?? string.Empty,
+                            user?.Email ?? string.Empty,
+                            assessment.Title
+                        );
 
                         await _emailService.SendEmailAsync(notice);
+                        await _emailService.SendEmailAsync(notice2);
                     }
                     catch
                     {

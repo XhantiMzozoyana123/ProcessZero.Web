@@ -1381,5 +1381,34 @@ namespace ProcessZero.Application.Constants
                 RecipientName = contact.FirstName + " " + contact.LastName
             };
         }
+
+        /// <summary>
+        /// Notify a sales rep that they passed the mandatory assessment and should book a call with the CEO.
+        /// </summary>
+        public static EmailDto NotifyBookMeetingWithTrainer(
+            string recipientName,
+            string recipientEmail,
+            string asessmentName)
+        {
+            var html = $@"
+<h2>&#127881; Congratulations — Assessment Passed!</h2>
+<p>Hi {System.Net.WebUtility.HtmlEncode(recipientName)},</p>
+<p>Well done! You have successfully passed the {asessmentName}.</p>
+
+<div class=""pz-panel-teal"">
+  <p><strong>Next Step:</strong> Please <a href=""https://cal.com/xhanti-mzozoyana-50g1ck/process-zero-executive-onboarding-call"" target=""_blank"" class=""pz-btn"">Book a Call with the CEO</a> to discuss your results and next steps in the ProcessZero journey.</p>
+</div>
+
+<hr class=""pz-divider"">
+<p style=""color:#607078;font-size:14px;"">Regards,<br/><strong style=""color:#172121;"">ProcessZero Team</strong></p>";
+
+            return new EmailDto
+            {
+                Subject = "Assessment Passed — Book a Call with the CEO",
+                Body = BrandedWrapWithTemplate(html),
+                RecipientEmail = recipientEmail ?? string.Empty,
+                RecipientName = recipientName ?? string.Empty
+            };
+        }
     }
 }

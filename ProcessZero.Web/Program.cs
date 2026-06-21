@@ -242,6 +242,19 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
     Authorization = new[] { new HangfireAuthorizationFilter() }
 });
 
+// -----------------------------
+// KUBERNETES ROUND-ROBIN TEST
+// -----------------------------
+app.MapGet("/whoami", () =>
+{
+    var podName = Environment.GetEnvironmentVariable("HOSTNAME") ?? "unknown";
+    return Results.Ok(new
+    {
+        Pod = podName,
+        Time = DateTime.UtcNow
+    });
+});
+
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
