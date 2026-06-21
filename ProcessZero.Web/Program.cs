@@ -141,6 +141,9 @@ builder.Services.AddAuthorization(options =>
 builder.Services.Configure<GoogleOAuthOptions>(
     builder.Configuration.GetSection("GoogleOAuth"));
 
+builder.Services.Configure<CalOptions>(
+    builder.Configuration.GetSection("CalOptions"));
+
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
@@ -178,6 +181,11 @@ builder.Services.AddScoped<IRelayInboxRotationService, RelayInboxRotationService
 builder.Services.AddScoped<IRelayEmailTrackingService, RelayEmailTrackingService>();
 builder.Services.AddScoped<IRelayA_BTestingService, RelayA_BTestingService>();
 builder.Services.AddScoped<IRelayEmailSenderService, RelayEmailSenderService>();
+
+// -----------------------------
+// CAL.COM INTEGRATION
+// -----------------------------
+builder.Services.AddHttpClient<ICalService, CalService>();
 
 // -----------------------------
 // LLM / AI
