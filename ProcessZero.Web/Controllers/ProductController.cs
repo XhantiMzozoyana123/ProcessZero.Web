@@ -24,6 +24,7 @@ namespace ProcessZero.Web.Controllers
     /// - Url (string) : Optional listing or landing page URL for the product.
     /// - NegotiableAmounts (string) : Optional text describing flexible pricing tiers.
     /// - ActualAmount (decimal) : The listed price / amount for the product.
+    /// - CalEventTypeId (int?) : Optional cal.com event type ID associated with this product (for scheduling integration).
     /// - CreatedAt (DateTime) : Timestamp when the product was created (from BaseEntity).
     /// - UpdatedAt (DateTime) : Timestamp when the product was last updated (from BaseEntity).
     ///
