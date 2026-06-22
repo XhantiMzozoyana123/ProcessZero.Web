@@ -18,6 +18,55 @@ namespace ProcessZero.Web.Controllers
     ///   POST   /api/cal/bookings/{id}/cancel  — Cancel a booking
     ///   GET    /api/cal/slots/available       — Get available time slots
     ///   POST   /api/cal/webhook               — Receive webhook events from cal.com
+    ///
+    /// <para><b>Entities used:</b></para>
+    /// <list type="bullet">
+    ///   <item><description><see cref="CreateCalBookingRequest"/> — Request DTO for creating a booking.
+    ///     Columns: <c>EventTypeId</c> (int, cal.com event type ID),
+    ///     <c>Attendee</c> (<see cref="CalAttendee"/>),
+    ///     <c>Start</c> / <c>End</c> (DateTimeOffset),
+    ///     <c>Location</c> (string?),
+    ///     <c>Metadata</c> (Dictionary<string,string>?),
+    ///     <c>OwnerEmail</c> (string?, optional owner attribution).</description></item>
+    ///   <item><description><see cref="CalAttendee"/> — Attendee details.
+    ///     Columns: <c>Name</c>, <c>Email</c>, <c>TimeZone</c> (string?),
+    ///     <c>Language</c> (string?), <c>Guests</c> (List<string>?),
+    ///     <c>Metadata</c> (Dictionary<string,string>?).</description></item>
+    ///   <item><description><see cref="CalBookingResponse"/> — Root wrapper from cal.com API.
+    ///     Columns: <c>Status</c> (string), <c>Data</c> (<see cref="CalBookingData"/>?),
+    ///     <c>Error</c> (<see cref="CalError"/>?).</description></item>
+    ///   <item><description><see cref="CalBookingData"/> — Booking payload.
+    ///     Columns: <c>Id</c> (int), <c>Uid</c> (string), <c>Title</c> (string),
+    ///     <c>Description</c> (string?), <c>StartTime</c> / <c>EndTime</c> (DateTimeOffset),
+    ///     <c>Status</c> (string), <c>CancellationReason</c> (string?),
+    ///     <c>CancelledByEmail</c> (string?), <c>Attendees</c> (List<CalAttendeeData>?),
+    ///     <c>Location</c> (string?), <c>MeetingUrl</c> (string?),
+    ///     <c>Metadata</c> (Dictionary<string,string>?),
+    ///     <c>EventTypeId</c> (int), <c>EventType</c> (<see cref="CalEventTypeData"/>?).</description></item>
+    ///   <item><description><see cref="CalAttendeeData"/> — Attendee info in responses.
+    ///     Columns: <c>Name</c>, <c>Email</c>, <c>TimeZone</c> (string?),
+    ///     <c>Language</c> (string?).</description></item>
+    ///   <item><description><see cref="CalEventTypeData"/> — cal.com event type metadata.
+    ///     Columns: <c>Id</c> (int), <c>Slug</c> (string), <c>Title</c> (string),
+    ///     <c>LengthMinutes</c> (int).</description></item>
+    ///   <item><description><see cref="CalError"/> — Error payload.
+    ///     Columns: <c>Code</c> (string), <c>Message</c> (string).</description></item>
+    ///   <item><description><see cref="CalAvailabilityRequest"/> — Request DTO for slot queries.
+    ///     Columns: <c>EventTypeId</c> (int), <c>StartDate</c> (string, "YYYY-MM-DD"),
+    ///     <c>EndDate</c> (string, "YYYY-MM-DD"), <c>TimeZone</c> (string?).</description></item>
+    ///   <item><description><see cref="CalAvailabilityResponse"/> — Root wrapper for availability.
+    ///     Columns: <c>Status</c> (string), <c>Data</c> (<see cref="CalAvailabilityData"/>?),
+    ///     <c>Error</c> (<see cref="CalError"/>?).</description></item>
+    ///   <item><description><see cref="CalAvailabilityData"/> — Availability payload.
+    ///     Columns: <c>Slots</c> (Dictionary<string, List<CalSlot>>?, keyed by date),
+    ///     <c>MinimumBookingNotice</c> (int, minutes),
+    ///     <c>LengthMinutes</c> (int, event duration).</description></item>
+    ///   <item><description><see cref="CalSlot"/> — A single available time slot.
+    ///     Columns: <c>Time</c> (DateTimeOffset), <c>Attendees</c> (int?, current bookings).</description></item>
+    ///   <item><description><see cref="CancelBookingRequest"/> — Cancel reason.
+    ///     Column: <c>Reason</c> (string?).</description></item>
+    ///   <item><description><see cref="Product"/> (domain entity) — <c>CalEventTypeId</c> (int?, links a product to a cal.com event type).</description></item>
+    /// </list>
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
