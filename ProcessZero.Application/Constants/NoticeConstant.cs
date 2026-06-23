@@ -734,7 +734,7 @@ namespace ProcessZero.Application.Constants
 
 <div class=""pz-info-box"">
   <h3>{System.Net.WebUtility.HtmlEncode(product.Name)}</h3>
-  <p>{System.Net.WebUtility.HtmlEncode(product.Description ?? string.Empty)}</p>
+  <p>{System.Net.WebUtility.HtmlEncode(AppConstant.ConvertHtmlToPlainText(product.Description) ?? string.Empty)}</p>
   <p><strong>&#128176; Current Price:</strong> {product.ActualAmount:C}</p>
   {negotiableSection}
 </div>
@@ -1012,7 +1012,7 @@ namespace ProcessZero.Application.Constants
 
 <div class=""pz-info-box"">
   <h3>{System.Net.WebUtility.HtmlEncode(product.Name)}</h3>
-  <p>{System.Net.WebUtility.HtmlEncode(product.Description ?? string.Empty)}</p>
+  <p>{System.Net.WebUtility.HtmlEncode(AppConstant.ConvertHtmlToPlainText(product.Description) ?? string.Empty)}</p>
   <p><strong>&#128176; Price:</strong> {product.ActualAmount:C}</p>
   {negotiableSection}
 </div>
@@ -1054,7 +1054,7 @@ namespace ProcessZero.Application.Constants
 
 <div class=""pz-info-box"">
   <h3>{System.Net.WebUtility.HtmlEncode(product.Name)}</h3>
-  <p>{System.Net.WebUtility.HtmlEncode(product.Description ?? string.Empty)}</p>
+  <p>{System.Net.WebUtility.HtmlEncode(AppConstant.ConvertHtmlToPlainText(product.Description) ?? string.Empty)}</p>
   <p style=""margin-bottom:0;""><strong>Last listed price:</strong> {product.ActualAmount:C}</p>
 </div>
 
