@@ -59,7 +59,7 @@ namespace ProcessZero.Infrastructure.Services
             if (request.EventTypeId <= 0)
                 request.EventTypeId = _options.EventTypeId;
 
-            var url = $"/bookings";
+            var url = "bookings";
 
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -80,7 +80,7 @@ namespace ProcessZero.Infrastructure.Services
             if (string.IsNullOrWhiteSpace(uid))
                 throw new ArgumentException("Booking UID is required", nameof(uid));
 
-            var url = $"/bookings/{Uri.EscapeDataString(uid)}";
+            var url = $"bookings/{Uri.EscapeDataString(uid)}";
 
             _logger.LogInformation("Fetching cal.com booking by UID: {Uid}", uid);
 
@@ -94,7 +94,7 @@ namespace ProcessZero.Infrastructure.Services
             int bookingId,
             CancellationToken cancellationToken = default)
         {
-            var url = $"/bookings/{bookingId}";
+            var url = $"bookings/{bookingId}";
 
             _logger.LogInformation("Fetching cal.com booking by ID: {BookingId}", bookingId);
 
@@ -109,7 +109,7 @@ namespace ProcessZero.Infrastructure.Services
             string? reason = null,
             CancellationToken cancellationToken = default)
         {
-            var url = $"/bookings/{bookingId}/cancel";
+            var url = $"bookings/{bookingId}/cancel";
 
             var body = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(reason))
@@ -147,7 +147,7 @@ namespace ProcessZero.Infrastructure.Services
                 queryParams.Add($"timeZone={Uri.EscapeDataString(request.TimeZone)}");
 
             var queryString = string.Join("&", queryParams);
-            var url = $"/slots/available?{queryString}";
+            var url = $"slots/available?{queryString}";
 
             _logger.LogInformation("Fetching available slots for eventTypeId {EventTypeId} from {StartDate} to {EndDate}",
                 request.EventTypeId, request.StartDate, request.EndDate);
