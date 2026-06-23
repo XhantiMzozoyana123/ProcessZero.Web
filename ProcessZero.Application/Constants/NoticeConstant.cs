@@ -282,7 +282,6 @@ namespace ProcessZero.Application.Constants
   <!-- Footer -->
   <div class=""pz-footer"">
     <p>&copy; 2026 Process Zero. All rights reserved.</p>
-    <a href=""#"">Unsubscribe</a> &nbsp;&middot;&nbsp; <a href=""#"">Preferences</a>
   </div>
 
   <div class=""pz-shadow""></div>
