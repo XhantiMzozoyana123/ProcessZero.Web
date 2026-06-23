@@ -211,13 +211,10 @@ builder.Services.AddScoped<RelayCampaignBackgroundService>();
 // -----------------------------
 // CORS
 // -----------------------------
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:3000", "http://localhost:5173" };
-
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(p =>
-        p.WithOrigins(allowedOrigins)
+        p.AllowAnyOrigin()
          .AllowAnyHeader()
          .AllowAnyMethod());
 });
@@ -303,7 +300,7 @@ async Task SeedAdminUser(
     UserManager<ApplicationUser> userManager,
     RoleManager<IdentityRole> roleManager)
 {
-    var email = "xhantimzozoyana123@gmail.com";
+    var email = "admin@processzero.xyz";
     var password = "StrongP@ssword123";
 
     if (!await roleManager.RoleExistsAsync("Admin"))
