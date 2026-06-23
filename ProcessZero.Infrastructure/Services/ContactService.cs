@@ -151,6 +151,11 @@ namespace ProcessZero.Infrastructure.Services
             if (contacts.Count == 0)
                 return;
 
+            foreach (var contact in contacts)
+            {
+                await RecycleLeadAsync(contact, false);
+            }
+
             await _context.Contacts.AddRangeAsync(contacts);
             await _context.SaveChangesAsync();
         }
@@ -159,20 +164,28 @@ namespace ProcessZero.Infrastructure.Services
         {
             if (deleted)
             {
-                LeadLake leadLake = new LeadLake()
-                {
-                    UserId = contact.UserId,
-                    FirstName = contact.FirstName,
-                    LastName = contact.LastName,
-                    Email = contact.Email,
-                    Phone = contact.Phone,
-                    Company = contact.Company,
-                    Job = contact.Job,
-                    Location = contact.Location
-                };
+                var leadExists = await _context.LeadLakes
+                    .FirstOrDefaultAsync(c => c.UserId == contact.UserId && c.Email == contact.Email);
 
-                _context.LeadLakes.Add(leadLake);
-                await _context.SaveChangesAsync();
+                if (leadExists == null)
+                {
+                    LeadLake leadLake = new LeadLake()
+                    {
+                        UserId = contact.UserId,
+                        FirstName = contact.FirstName,
+                        LastName = contact.LastName,
+                        Email = contact.Email,
+                        Phone = contact.Phone,
+                        Company = contact.Company,
+                        Job = contact.Job,
+                        Location = contact.Location,
+                        Industry = LeadLakeIndustry.Other,
+                        Intent = LeadIntent.Low
+                    };
+
+                    _context.LeadLakes.Add(leadLake);
+                    await _context.SaveChangesAsync();
+                }
             }
             else
             {
@@ -185,8 +198,6 @@ namespace ProcessZero.Infrastructure.Services
                     await _context.SaveChangesAsync();
                 }
             }
-
         }
     }
-
 }
