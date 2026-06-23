@@ -52,6 +52,11 @@ namespace ProcessZero.Application.Dtos
 
         [JsonPropertyName("metadata")]
         public Dictionary<string, string>? Metadata { get; set; }
+
+        public bool ShouldSerializeTimeZone() => !string.IsNullOrWhiteSpace(TimeZone);
+        public bool ShouldSerializeLanguage() => !string.IsNullOrWhiteSpace(Language);
+        public bool ShouldSerializeGuests() => Guests is { Count: > 0 };
+        public bool ShouldSerializeMetadata() => Metadata is { Count: > 0 };
     }
 
     // ---------- Response DTOs ----------

@@ -39,13 +39,25 @@ namespace ProcessZero.Infrastructure.Services
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
 
+            // Normalize the incoming config value: ensure exactly one trailing slash
+            var configuredBase = (_options.BaseUrl ?? string.Empty).TrimEnd('/');
+            var normalizedBase = string.IsNullOrWhiteSpace(configuredBase)
+                ? "https://api.cal.com/v2/"
+                : configuredBase + "/";
+
             // Configure the HttpClient with the base URL and auth header
-            _httpClient.BaseAddress = new Uri(_options.BaseUrl.TrimEnd('/'));
+            _httpClient.BaseAddress = new Uri(normalizedBase);
             _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_options.ApiKey}");
             _httpClient.DefaultRequestHeaders.Add(CalApiVersionHeader, CalApiVersionValue);
             _httpClient.DefaultRequestHeaders.Accept.Add(
                 new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+
+            _logger.LogInformation(
+                "CalService initialized. BaseAddress={BaseAddress}, EventTypeId={EventTypeId}, ApiKeyPrefix={ApiKeyPrefix}",
+                _httpClient.BaseAddress,
+                _options.EventTypeId,
+                string.IsNullOrWhiteSpace(_options.ApiKey) ? "<missing>" : _options.ApiKey[..Math.Min(10, _options.ApiKey.Length)]);
         }
 
         // ──── Create Booking ────────────────────────────────────────────────
@@ -61,11 +73,30 @@ namespace ProcessZero.Infrastructure.Services
 
             var url = "bookings";
 
+            // cal.com rejects null-valued optional fields; remove them from the graph
+            // before serialization so System.Text.Json omits them from JSON.
+            var attendee = request.Attendee;
+            if (attendee != null)
+            {
+                if (string.IsNullOrWhiteSpace(attendee.TimeZone))
+                    attendee.TimeZone = null;
+                if (string.IsNullOrWhiteSpace(attendee.Language))
+                    attendee.Language = null;
+                if (attendee.Guests is { Count: 0 })
+                    attendee.Guests = null;
+                if (attendee.Metadata is { Count: 0 })
+                    attendee.Metadata = null;
+            }
+            if (request.Metadata is { Count: 0 })
+                request.Metadata = null;
+
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Creating cal.com booking for {AttendeeEmail} (eventTypeId: {EventTypeId})",
-                request.Attendee.Email, request.EventTypeId);
+            var fullUrl = new Uri(_httpClient.BaseAddress!, url);
+            _logger.LogInformation(
+                "Creating cal.com booking for {AttendeeEmail} (eventTypeId: {EventTypeId}). FullUrl={FullUrl}",
+                request.Attendee.Email, request.EventTypeId, fullUrl);
 
             var response = await _httpClient.PostAsync(url, content, cancellationToken);
             return await DeserializeResponseAsync<CalBookingResponse>(response, cancellationToken);
