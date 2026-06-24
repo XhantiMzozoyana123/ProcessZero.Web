@@ -6,6 +6,7 @@ using ProcessZero.Application.Options;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ProcessZero.Infrastructure.Services
 {
@@ -22,7 +23,7 @@ namespace ProcessZero.Infrastructure.Services
         private readonly JsonSerializerOptions _jsonOptions;
 
         private const string CalApiVersionHeader = "cal-api-version";
-        private const string CalApiVersionValue = "2024-06-14";
+        private const string CalApiVersionValue = "2026-02-25";
 
         public CalService(
             HttpClient httpClient,
@@ -36,7 +37,8 @@ namespace ProcessZero.Infrastructure.Services
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
 
             // Normalize the incoming config value: ensure exactly one trailing slash
@@ -73,24 +75,14 @@ namespace ProcessZero.Infrastructure.Services
 
             var url = "bookings";
 
-            // cal.com rejects null-valued optional fields; remove them from the graph
-            // before serialization so System.Text.Json omits them from JSON.
-            var attendee = request.Attendee;
-            if (attendee != null)
-            {
-                if (string.IsNullOrWhiteSpace(attendee.TimeZone))
-                    attendee.TimeZone = null;
-                if (string.IsNullOrWhiteSpace(attendee.Language))
-                    attendee.Language = null;
-                if (attendee.Guests is { Count: 0 })
-                    attendee.Guests = null;
-                if (attendee.Metadata is { Count: 0 })
-                    attendee.Metadata = null;
-            }
-            if (request.Metadata is { Count: 0 })
-                request.Metadata = null;
+            // cal.com v2 requires timeZone and language as non-null strings with defaults
+            if (string.IsNullOrWhiteSpace(request.Attendee.TimeZone))
+                request.Attendee.TimeZone = "UTC";
+            if (string.IsNullOrWhiteSpace(request.Attendee.Language))
+                request.Attendee.Language = "en";
 
             var json = JsonSerializer.Serialize(request, _jsonOptions);
+            _logger.LogInformation("Cal.com request JSON: {Json}", json);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var fullUrl = new Uri(_httpClient.BaseAddress!, url);
@@ -170,8 +162,8 @@ namespace ProcessZero.Infrastructure.Services
             var queryParams = new List<string>
             {
                 $"eventTypeId={request.EventTypeId}",
-                $"startDate={Uri.EscapeDataString(request.StartDate)}",
-                $"endDate={Uri.EscapeDataString(request.EndDate)}"
+                $"startTime={Uri.EscapeDataString(request.StartTime)}",
+                $"endTime={Uri.EscapeDataString(request.EndTime)}"
             };
 
             if (!string.IsNullOrWhiteSpace(request.TimeZone))
@@ -180,8 +172,8 @@ namespace ProcessZero.Infrastructure.Services
             var queryString = string.Join("&", queryParams);
             var url = $"slots/available?{queryString}";
 
-            _logger.LogInformation("Fetching available slots for eventTypeId {EventTypeId} from {StartDate} to {EndDate}",
-                request.EventTypeId, request.StartDate, request.EndDate);
+            _logger.LogInformation("Fetching available slots for eventTypeId {EventTypeId} from {StartTime} to {EndTime}",
+                request.EventTypeId, request.StartTime, request.EndTime);
 
             var response = await _httpClient.GetAsync(url, cancellationToken);
             return await DeserializeResponseAsync<CalAvailabilityResponse>(response, cancellationToken);

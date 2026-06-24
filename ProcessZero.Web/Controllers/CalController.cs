@@ -21,17 +21,15 @@ namespace ProcessZero.Web.Controllers
     ///
     /// <para><b>Entities used:</b></para>
     /// <list type="bullet">
-    ///   <item><description><see cref="CreateCalBookingRequest"/> — Request DTO for creating a booking.
+    ///   <item><description><see cref="CreateCalBookingRequest"/> — Request DTO for creating a booking (cal.com v2 API).
     ///     Columns: <c>EventTypeId</c> (int, cal.com event type ID),
     ///     <c>Attendee</c> (<see cref="CalAttendee"/>),
-    ///     <c>Start</c> / <c>End</c> (DateTimeOffset),
-    ///     <c>Location</c> (string?),
-    ///     <c>Metadata</c> (Dictionary<string,string>?),
-    ///     <c>OwnerEmail</c> (string?, optional owner attribution).</description></item>
+    ///     <c>Start</c> (DateTimeOffset, ISO 8601 UTC start time),
+    ///     <c>Metadata</c> (Dictionary<string,string>?, optional custom data).</description></item>
     ///   <item><description><see cref="CalAttendee"/> — Attendee details.
-    ///     Columns: <c>Name</c>, <c>Email</c>, <c>TimeZone</c> (string?),
-    ///     <c>Language</c> (string?), <c>Guests</c> (List<string>?),
-    ///     <c>Metadata</c> (Dictionary<string,string>?).</description></item>
+    ///     Columns: <c>Name</c> (string), <c>Email</c> (string),
+    ///     <c>TimeZone</c> (string, IANA timezone, default "UTC"),
+    ///     <c>Language</c> (string, ISO language code, default "en").</description></item>
     ///   <item><description><see cref="CalBookingResponse"/> — Root wrapper from cal.com API.
     ///     Columns: <c>Status</c> (string), <c>Data</c> (<see cref="CalBookingData"/>?),
     ///     <c>Error</c> (<see cref="CalError"/>?).</description></item>
@@ -52,8 +50,8 @@ namespace ProcessZero.Web.Controllers
     ///   <item><description><see cref="CalError"/> — Error payload.
     ///     Columns: <c>Code</c> (string), <c>Message</c> (string).</description></item>
     ///   <item><description><see cref="CalAvailabilityRequest"/> — Request DTO for slot queries.
-    ///     Columns: <c>EventTypeId</c> (int), <c>StartDate</c> (string, "YYYY-MM-DD"),
-    ///     <c>EndDate</c> (string, "YYYY-MM-DD"), <c>TimeZone</c> (string?).</description></item>
+    ///     Columns: <c>EventTypeId</c> (int), <c>StartTime</c> (string, ISO 8601 e.g. "2026-06-25T00:00:00Z"),
+    ///     <c>EndTime</c> (string, ISO 8601 e.g. "2026-06-26T00:00:00Z"), <c>TimeZone</c> (string?, IANA timezone).</description></item>
     ///   <item><description><see cref="CalAvailabilityResponse"/> — Root wrapper for availability.
     ///     Columns: <c>Status</c> (string), <c>Data</c> (<see cref="CalAvailabilityData"/>?),
     ///     <c>Error</c> (<see cref="CalError"/>?).</description></item>
@@ -105,11 +103,8 @@ namespace ProcessZero.Web.Controllers
             if (string.IsNullOrWhiteSpace(request.Attendee?.Name))
                 return BadRequest("Attendee name is required");
 
-            if (request.Start == default || request.End == default)
-                return BadRequest("Start and end times are required");
-
-            if (request.Start >= request.End)
-                return BadRequest("Start time must be before end time");
+            if (request.Start == default)
+                return BadRequest("Start time is required");
 
             try
             {
@@ -258,8 +253,8 @@ namespace ProcessZero.Web.Controllers
             var request = new CalAvailabilityRequest
             {
                 EventTypeId = eventTypeId ?? 0,
-                StartDate = startDate,
-                EndDate = endDate,
+                StartTime = startDate.Contains('T') ? startDate : $"{startDate}T00:00:00Z",
+                EndTime = endDate.Contains('T') ? endDate : $"{endDate}T00:00:00Z",
                 TimeZone = timeZone
             };
 

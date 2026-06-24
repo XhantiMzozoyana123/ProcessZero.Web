@@ -16,21 +16,8 @@ namespace ProcessZero.Application.Dtos
         [JsonPropertyName("start")]
         public DateTimeOffset Start { get; set; }
 
-        [JsonPropertyName("end")]
-        public DateTimeOffset End { get; set; }
-
-        [JsonPropertyName("location")]
-        public string? Location { get; set; }
-
         [JsonPropertyName("metadata")]
         public Dictionary<string, string>? Metadata { get; set; }
-
-        /// <summary>
-        /// Optional: the user requesting the booking. cal.com will use this to
-        /// credit the booking to a specific user (by email).
-        /// </summary>
-        [JsonPropertyName("owner")]
-        public string? OwnerEmail { get; set; }
     }
 
     public class CalAttendee
@@ -42,21 +29,10 @@ namespace ProcessZero.Application.Dtos
         public string Email { get; set; } = string.Empty;
 
         [JsonPropertyName("timeZone")]
-        public string? TimeZone { get; set; }
+        public string TimeZone { get; set; } = "UTC";
 
         [JsonPropertyName("language")]
-        public string? Language { get; set; }
-
-        [JsonPropertyName("guests")]
-        public List<string>? Guests { get; set; }
-
-        [JsonPropertyName("metadata")]
-        public Dictionary<string, string>? Metadata { get; set; }
-
-        public bool ShouldSerializeTimeZone() => !string.IsNullOrWhiteSpace(TimeZone);
-        public bool ShouldSerializeLanguage() => !string.IsNullOrWhiteSpace(Language);
-        public bool ShouldSerializeGuests() => Guests is { Count: > 0 };
-        public bool ShouldSerializeMetadata() => Metadata is { Count: > 0 };
+        public string Language { get; set; } = "en";
     }
 
     // ---------- Response DTOs ----------
@@ -165,19 +141,16 @@ namespace ProcessZero.Application.Dtos
 
     // ---------- Availability ----------
 
-    /// <summary>
-    /// Request to query cal.com for available slots.
-    /// </summary>
     public class CalAvailabilityRequest
     {
         [JsonPropertyName("eventTypeId")]
         public int EventTypeId { get; set; }
 
-        [JsonPropertyName("startDate")]
-        public string StartDate { get; set; } = string.Empty; // "YYYY-MM-DD"
+        [JsonPropertyName("startTime")]
+        public string StartTime { get; set; } = string.Empty;
 
-        [JsonPropertyName("endDate")]
-        public string EndDate { get; set; } = string.Empty;   // "YYYY-MM-DD"
+        [JsonPropertyName("endTime")]
+        public string EndTime { get; set; } = string.Empty;
 
         [JsonPropertyName("timeZone")]
         public string? TimeZone { get; set; }
@@ -218,10 +191,6 @@ namespace ProcessZero.Application.Dtos
 
     // ---------- Webhook payloads ----------
 
-    /// <summary>
-    /// Payload sent by cal.com webhook when a booking is created.
-    /// Map this to the trigger event "BOOKING_CREATED".
-    /// </summary>
     public class CalWebhookBookingCreated
     {
         [JsonPropertyName("triggerEvent")]
@@ -273,10 +242,6 @@ namespace ProcessZero.Application.Dtos
         public Dictionary<string, string>? Metadata { get; set; }
     }
 
-    /// <summary>
-    /// Payload sent by cal.com webhook when a booking is cancelled.
-    /// Map this to the trigger event "BOOKING_CANCELLED".
-    /// </summary>
     public class CalWebhookBookingCancelled
     {
         [JsonPropertyName("triggerEvent")]
