@@ -24,8 +24,7 @@ namespace ProcessZero.Web.Controllers
     ///   <item><description><see cref="CreateCalBookingRequest"/> — Request DTO for creating a booking (cal.com v2 API).
     ///     Columns: <c>EventTypeId</c> (int, cal.com event type ID),
     ///     <c>Attendee</c> (<see cref="CalAttendee"/>),
-    ///     <c>Start</c> (DateTimeOffset, ISO 8601 UTC start time),
-    ///     <c>Metadata</c> (Dictionary<string,string>?, optional custom data).</description></item>
+    ///     <c>Start</c> (DateTimeOffset, ISO 8601 UTC start time).</description></item>
     ///   <item><description><see cref="CalAttendee"/> — Attendee details.
     ///     Columns: <c>Name</c> (string), <c>Email</c> (string),
     ///     <c>TimeZone</c> (string, IANA timezone, default "UTC"),

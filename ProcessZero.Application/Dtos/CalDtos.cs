@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ProcessZero.Application.Dtos
@@ -14,10 +15,8 @@ namespace ProcessZero.Application.Dtos
         public CalAttendee Attendee { get; set; } = new();
 
         [JsonPropertyName("start")]
+        [JsonConverter(typeof(StrictUtcDateTimeOffsetConverter))]
         public DateTimeOffset Start { get; set; }
-
-        [JsonPropertyName("metadata")]
-        public Dictionary<string, string>? Metadata { get; set; }
     }
 
     public class CalAttendee
@@ -33,6 +32,32 @@ namespace ProcessZero.Application.Dtos
 
         [JsonPropertyName("language")]
         public string Language { get; set; } = "en";
+    }
+
+    /// <summary>
+    /// Custom converter that ensures <see cref="DateTimeOffset"/> values
+    /// are always serialized in strict UTC ISO 8601 format with the 'Z' suffix
+    /// (e.g. "2026-06-25T08:00:00Z"), matching cal.com API expectations.
+    /// </summary>
+    public class StrictUtcDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
+    {
+        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var value = reader.GetString();
+            if (string.IsNullOrWhiteSpace(value))
+                throw new JsonException("Start time is required");
+
+            if (!DateTimeOffset.TryParse(value, out var dto))
+                throw new JsonException($"Invalid date time format: {value}");
+
+            return dto.ToUniversalTime();
+        }
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
+        {
+            var utcValue = value.ToUniversalTime();
+            writer.WriteStringValue(utcValue.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+        }
     }
 
     // ---------- Response DTOs ----------
