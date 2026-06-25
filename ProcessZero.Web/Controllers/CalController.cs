@@ -16,7 +16,9 @@ namespace ProcessZero.Web.Controllers
     ///   GET    /api/cal/bookings/{id}         — Get booking by numeric ID
     ///   GET    /api/cal/bookings/uid/{uid}    — Get booking by UID
     ///   POST   /api/cal/bookings/{id}/cancel  — Cancel a booking
-    ///   GET    /api/cal/slots/available       — Get available time slots
+    ///   GET    /api/cal/slots/available       — Get available time slots for a date range
+    ///   GET    /api/cal/slots/all             — Get all available slots for default event type over next 90 days
+    ///   GET    /api/cal/slots/datetimes       — Get flattened sorted list of available date/times for an event type
     ///   POST   /api/cal/webhook               — Receive webhook events from cal.com
     ///
     /// <para><b>Entities used:</b></para>
@@ -269,6 +271,55 @@ namespace ProcessZero.Web.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching available slots from cal.com");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
+            }
+        }
+
+        /// <summary>
+        /// GET: api/cal/slots/all
+        /// Returns every available booking slot for the configured/default event type
+        /// over a large window (next 90 days).
+        /// Requires authentication.
+        /// </summary>
+        [HttpGet("slots/all")]
+        [Authorize]
+        public async Task<IActionResult> GetAllAvailableSlots(CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await _calService.GetAllAvailableSlotsAsync(0, cancellationToken);
+
+                if (result.Error != null)
+                    return StatusCode(StatusCodes.Status502BadGateway, new { error = result.Error.Message });
+
+                return Ok(result.Data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching all available slots from cal.com");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
+            }
+        }
+
+        /// <summary>
+        /// GET: api/cal/slots/datetimes?eventTypeId=123
+        /// Returns a flattened, sorted list of all available date/times for an event type.
+        /// Requires authentication.
+        /// </summary>
+        [HttpGet("slots/datetimes")]
+        [Authorize]
+        public async Task<IActionResult> GetAllAvailableDateTimes(
+            [FromQuery] int? eventTypeId,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var times = await _calService.GetAllAvailableDateTimesAsync(eventTypeId ?? 0, cancellationToken);
+                return Ok(times);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching flattened available date/times from cal.com");
                 return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
             }
         }

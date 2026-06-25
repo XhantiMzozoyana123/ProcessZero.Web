@@ -5,6 +5,9 @@ namespace ProcessZero.Application.Interfaces
     /// <summary>
     /// Service for integrating with cal.com scheduling API.
     /// Provides booking management, availability checks, and webhook processing.
+    ///
+    /// Supports both targeted date-range slot queries and large-range availability retrieval
+    /// that returns every available booking slot for an event type over a broad window.
     /// </summary>
     public interface ICalService
     {
@@ -38,6 +41,21 @@ namespace ProcessZero.Application.Interfaces
         /// Queries available time slots for a given event type and date range.
         /// </summary>
         Task<CalAvailabilityResponse> GetAvailableSlotsAsync(CalAvailabilityRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Returns every available booking slot for an event type in a large date range (default next 90 days).
+        /// Queries Cal.com with a larger window so all slots are captured in a single call.
+        /// </summary>
+        /// <param name="eventTypeId">The Cal.com event type ID.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        Task<CalAvailabilityResponse> GetAllAvailableSlotsAsync(int eventTypeId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Flattens all available slots for an event type into a sorted list of date/times.
+        /// </summary>
+        /// <param name="eventTypeId">The Cal.com event type ID.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        Task<List<DateTimeOffset>> GetAllAvailableDateTimesAsync(int eventTypeId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Processes a webhook payload from cal.com.

@@ -14,6 +14,9 @@ namespace ProcessZero.Infrastructure.Services
     /// Service for integrating with cal.com scheduling API (v2).
     /// Uses an API key for authentication and supports booking CRUD,
     /// availability queries, and webhook processing.
+    ///
+    /// Includes large-range availability methods that query a 90-day window and can
+    /// return either the raw Cal.com slot structure or a flattened sorted list of date/times.
     /// </summary>
     public class CalService : ICalService
     {
@@ -170,13 +173,64 @@ namespace ProcessZero.Infrastructure.Services
                 queryParams.Add($"timeZone={Uri.EscapeDataString(request.TimeZone)}");
 
             var queryString = string.Join("&", queryParams);
-            var url = $"slots/available?{queryString}";
+            var url = $"slots/available";
 
             _logger.LogInformation("Fetching available slots for eventTypeId {EventTypeId} from {StartTime} to {EndTime}",
                 request.EventTypeId, request.StartTime, request.EndTime);
 
             var response = await _httpClient.GetAsync(url, cancellationToken);
             return await DeserializeResponseAsync<CalAvailabilityResponse>(response, cancellationToken);
+        }
+
+        // ──── GetAllAvailableSlotsAsync ────────────────────────────────────
+
+        public async Task<CalAvailabilityResponse> GetAllAvailableSlotsAsync(
+            int eventTypeId,
+            CancellationToken cancellationToken = default)
+        {
+            if (eventTypeId <= 0)
+                eventTypeId = _options.EventTypeId;
+
+            var startTime = DateTime.UtcNow;
+            var endTime = startTime.AddDays(90);
+
+            var url =
+                $"slots/available?" +
+                $"eventTypeId={eventTypeId}" +
+                $"&startTime={Uri.EscapeDataString(startTime.ToString("o"))}" +
+                $"&endTime={Uri.EscapeDataString(endTime.ToString("o"))}";
+
+
+            _logger.LogInformation(
+                "Fetching all available slots for eventTypeId {EventTypeId} over next 90 days ({Start} to {End})",
+                eventTypeId, startTime, endTime);
+
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            return await DeserializeResponseAsync<CalAvailabilityResponse>(response, cancellationToken);
+        }
+
+        // ──── GetAllAvailableDateTimesAsync ────────────────────────────────
+
+        public async Task<List<DateTimeOffset>> GetAllAvailableDateTimesAsync(
+            int eventTypeId,
+            CancellationToken cancellationToken = default)
+        {
+            var availability = await GetAllAvailableSlotsAsync(eventTypeId, cancellationToken);
+
+            var slots = new List<DateTimeOffset>();
+
+            if (availability.Data?.Slots != null)
+            {
+                foreach (var day in availability.Data.Slots)
+                {
+                    foreach (var slot in day.Value)
+                    {
+                        slots.Add(slot.Time);
+                    }
+                }
+            }
+
+            return slots.OrderBy(x => x).ToList();
         }
 
         // ──── Webhook Handler ──────────────────────────────────────────────
