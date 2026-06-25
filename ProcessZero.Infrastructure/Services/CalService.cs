@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ProcessZero.Application.Dtos;
@@ -99,24 +100,25 @@ namespace ProcessZero.Infrastructure.Services
         }
 
         public async Task<CalBookingResponse> CancelBookingAsync(
-    int bookingId,
-    string? reason = null,
-    CancellationToken cancellationToken = default)
-        {
-            var body = JsonSerializer.Serialize(new
-            {
-                reason = reason ?? "Cancelled via application"
-            }, _jsonOptions);
+            int bookingId,
+            string? reason = null,
+            CancellationToken cancellationToken = default)
+                {
+                    var body = JsonSerializer.Serialize(new
+                    {
+                        reason = reason ?? "Cancelled via application"
+                    }, _jsonOptions);
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"bookings/{bookingId}/cancel");
-            request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+                    using var request = new HttpRequestMessage(HttpMethod.Post, $"bookings/{bookingId}/cancel");
+                    request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            request.Headers.Accept.Add(
-                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                    request.Headers.Accept.Add(
+                        new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+                    request.Headers.Add("cal-api-version", "2026-02-25");
 
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+                    var response = await _httpClient.SendAsync(request, cancellationToken);
 
-            return await DeserializeResponseAsync<CalBookingResponse>(response, cancellationToken);
+                    return await DeserializeResponseAsync<CalBookingResponse>(response, cancellationToken);
         }
 
         // ──── Availability Logic (Respecting Dynamic Timezones) ───────────
