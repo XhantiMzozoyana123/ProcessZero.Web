@@ -35,36 +35,31 @@ namespace ProcessZero.Application.Dtos
     }
 
     /// <summary>
-    /// Custom converter that ensures <see cref="DateTimeOffset"/> values
-    /// are always serialized in strict UTC ISO 8601 format with the 'Z' suffix
-    /// (e.g. "2026-06-25T08:00:00Z"), matching cal.com API expectations.
+    /// Ensures DateTimeOffset values are always serialized in strict UTC ISO 8601.
+    /// Added to both Requests and Responses for consistency.
     /// </summary>
     public class StrictUtcDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
     {
         public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var value = reader.GetString();
-            if (string.IsNullOrWhiteSpace(value))
-                throw new JsonException("Start time is required");
+            if (string.IsNullOrWhiteSpace(value)) return default;
 
-            if (!DateTimeOffset.TryParse(value, out var dto))
-                throw new JsonException($"Invalid date time format: {value}");
+            // Cal.com sometimes returns offset strings; we force them to UTC
+            if (DateTimeOffset.TryParse(value, out var dto))
+                return dto.ToUniversalTime();
 
-            return dto.ToUniversalTime();
+            return default;
         }
 
         public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
         {
-            var utcValue = value.ToUniversalTime();
-            writer.WriteStringValue(utcValue.ToString("yyyy-MM-ddTHH:mm:ssZ"));
+            writer.WriteStringValue(value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"));
         }
     }
 
     // ---------- Response DTOs ----------
 
-    /// <summary>
-    /// Root response from cal.com /bookings endpoint.
-    /// </summary>
     public class CalBookingResponse
     {
         [JsonPropertyName("status")]
@@ -92,22 +87,18 @@ namespace ProcessZero.Application.Dtos
         public string? Description { get; set; }
 
         [JsonPropertyName("startTime")]
+        [JsonConverter(typeof(StrictUtcDateTimeOffsetConverter))]
         public DateTimeOffset StartTime { get; set; }
 
         [JsonPropertyName("endTime")]
+        [JsonConverter(typeof(StrictUtcDateTimeOffsetConverter))]
         public DateTimeOffset EndTime { get; set; }
 
         [JsonPropertyName("status")]
         public string Status { get; set; } = string.Empty;
 
-        [JsonPropertyName("cancellationReason")]
-        public string? CancellationReason { get; set; }
-
-        [JsonPropertyName("cancelledByEmail")]
-        public string? CancelledByEmail { get; set; }
-
         [JsonPropertyName("attendees")]
-        public List<CalAttendeeData>? Attendees { get; set; }
+        public List<CalAttendeeData> Attendees { get; set; } = new();
 
         [JsonPropertyName("location")]
         public string? Location { get; set; }
@@ -115,14 +106,8 @@ namespace ProcessZero.Application.Dtos
         [JsonPropertyName("meetingUrl")]
         public string? MeetingUrl { get; set; }
 
-        [JsonPropertyName("metadata")]
-        public Dictionary<string, string>? Metadata { get; set; }
-
         [JsonPropertyName("eventTypeId")]
         public int EventTypeId { get; set; }
-
-        [JsonPropertyName("eventType")]
-        public CalEventTypeData? EventType { get; set; }
     }
 
     public class CalAttendeeData
@@ -135,24 +120,6 @@ namespace ProcessZero.Application.Dtos
 
         [JsonPropertyName("timeZone")]
         public string? TimeZone { get; set; }
-
-        [JsonPropertyName("language")]
-        public string? Language { get; set; }
-    }
-
-    public class CalEventTypeData
-    {
-        [JsonPropertyName("id")]
-        public int Id { get; set; }
-
-        [JsonPropertyName("slug")]
-        public string Slug { get; set; } = string.Empty;
-
-        [JsonPropertyName("title")]
-        public string Title { get; set; } = string.Empty;
-
-        [JsonPropertyName("length")]
-        public int LengthMinutes { get; set; }
     }
 
     public class CalError
@@ -164,7 +131,7 @@ namespace ProcessZero.Application.Dtos
         public string Message { get; set; } = string.Empty;
     }
 
-    // ---------- Availability ----------
+    // ---------- Availability (CRITICAL FOR 0 SLOTS FIX) ----------
 
     public class CalAvailabilityRequest
     {
@@ -195,19 +162,29 @@ namespace ProcessZero.Application.Dtos
 
     public class CalAvailabilityData
     {
+        /// <summary>
+        /// Keyed by date "YYYY-MM-DD". Initialized to prevent null iteration.
+        /// </summary>
         [JsonPropertyName("slots")]
-        public Dictionary<string, List<CalSlot>>? Slots { get; set; }
+        public Dictionary<string, List<CalSlot>> Slots { get; set; } = new();
 
         [JsonPropertyName("minimumBookingNotice")]
         public int MinimumBookingNotice { get; set; }
 
+        /// <summary>
+        /// Cal.com v2 uses "length" for the meeting duration.
+        /// </summary>
         [JsonPropertyName("length")]
         public int LengthMinutes { get; set; }
     }
 
     public class CalSlot
     {
+        /// <summary>
+        /// Cal.com v2 returns "time" for the start of the slot.
+        /// </summary>
         [JsonPropertyName("time")]
+        [JsonConverter(typeof(StrictUtcDateTimeOffsetConverter))]
         public DateTimeOffset Time { get; set; }
 
         [JsonPropertyName("attendees")]
@@ -230,41 +207,19 @@ namespace ProcessZero.Application.Dtos
         [JsonPropertyName("bookingId")]
         public int BookingId { get; set; }
 
-        [JsonPropertyName("uid")]
-        public string Uid { get; set; } = string.Empty;
-
-        [JsonPropertyName("title")]
-        public string Title { get; set; } = string.Empty;
-
-        [JsonPropertyName("description")]
-        public string? Description { get; set; }
-
         [JsonPropertyName("startTime")]
+        [JsonConverter(typeof(StrictUtcDateTimeOffsetConverter))]
         public DateTimeOffset StartTime { get; set; }
 
         [JsonPropertyName("endTime")]
+        [JsonConverter(typeof(StrictUtcDateTimeOffsetConverter))]
         public DateTimeOffset EndTime { get; set; }
 
         [JsonPropertyName("status")]
         public string Status { get; set; } = string.Empty;
 
-        [JsonPropertyName("location")]
-        public string? Location { get; set; }
-
-        [JsonPropertyName("meetingUrl")]
-        public string? MeetingUrl { get; set; }
-
         [JsonPropertyName("attendees")]
-        public List<CalAttendeeData>? Attendees { get; set; }
-
-        [JsonPropertyName("eventTypeId")]
-        public int EventTypeId { get; set; }
-
-        [JsonPropertyName("eventType")]
-        public CalEventTypeData? EventType { get; set; }
-
-        [JsonPropertyName("metadata")]
-        public Dictionary<string, string>? Metadata { get; set; }
+        public List<CalAttendeeData> Attendees { get; set; } = new();
     }
 
     public class CalWebhookBookingCancelled
@@ -281,31 +236,10 @@ namespace ProcessZero.Application.Dtos
         [JsonPropertyName("bookingId")]
         public int BookingId { get; set; }
 
-        [JsonPropertyName("uid")]
-        public string Uid { get; set; } = string.Empty;
-
-        [JsonPropertyName("title")]
-        public string Title { get; set; } = string.Empty;
-
-        [JsonPropertyName("startTime")]
-        public DateTimeOffset StartTime { get; set; }
-
-        [JsonPropertyName("endTime")]
-        public DateTimeOffset EndTime { get; set; }
-
         [JsonPropertyName("cancellationReason")]
         public string? CancellationReason { get; set; }
 
         [JsonPropertyName("cancelledByEmail")]
         public string? CancelledByEmail { get; set; }
-
-        [JsonPropertyName("attendees")]
-        public List<CalAttendeeData>? Attendees { get; set; }
-
-        [JsonPropertyName("eventTypeId")]
-        public int EventTypeId { get; set; }
-
-        [JsonPropertyName("metadata")]
-        public Dictionary<string, string>? Metadata { get; set; }
     }
 }

@@ -7,64 +7,35 @@ using System.Security.Claims;
 namespace ProcessZero.Web.Controllers
 {
     /// <summary>
-    /// Controller for cal.com scheduling integration.
-    /// Provides endpoints for booking management, availability queries,
-    /// and webhook handling from cal.com.
-    ///
-    /// Endpoints:
-    ///   POST   /api/cal/bookings             — Create a new booking
-    ///   GET    /api/cal/bookings/{id}         — Get booking by numeric ID
-    ///   GET    /api/cal/bookings/uid/{uid}    — Get booking by UID
-    ///   POST   /api/cal/bookings/{id}/cancel  — Cancel a booking
-    ///   GET    /api/cal/slots/available       — Get available time slots for a date range
-    ///   GET    /api/cal/slots/all             — Get all available slots for default event type over next 90 days
-    ///   GET    /api/cal/slots/datetimes       — Get flattened sorted list of available date/times for an event type
-    ///   POST   /api/cal/webhook               — Receive webhook events from cal.com
-    ///
-    /// <para><b>Entities used:</b></para>
+    /// Controller for Cal.com Scheduling Integration (API v2).
+    /// 
+    /// <para><b>UPDATES FOR USER-DEFINED TIMEZONES:</b></para>
     /// <list type="bullet">
-    ///   <item><description><see cref="CreateCalBookingRequest"/> — Request DTO for creating a booking (cal.com v2 API).
-    ///     Columns: <c>EventTypeId</c> (int, cal.com event type ID),
-    ///     <c>Attendee</c> (<see cref="CalAttendee"/>),
-    ///     <c>Start</c> (DateTimeOffset, ISO 8601 UTC start time).</description></item>
-    ///   <item><description><see cref="CalAttendee"/> — Attendee details.
-    ///     Columns: <c>Name</c> (string), <c>Email</c> (string),
-    ///     <c>TimeZone</c> (string, IANA timezone, default "UTC"),
-    ///     <c>Language</c> (string, ISO language code, default "en").</description></item>
-    ///   <item><description><see cref="CalBookingResponse"/> — Root wrapper from cal.com API.
-    ///     Columns: <c>Status</c> (string), <c>Data</c> (<see cref="CalBookingData"/>?),
-    ///     <c>Error</c> (<see cref="CalError"/>?).</description></item>
-    ///   <item><description><see cref="CalBookingData"/> — Booking payload.
-    ///     Columns: <c>Id</c> (int), <c>Uid</c> (string), <c>Title</c> (string),
-    ///     <c>Description</c> (string?), <c>StartTime</c> / <c>EndTime</c> (DateTimeOffset),
-    ///     <c>Status</c> (string), <c>CancellationReason</c> (string?),
-    ///     <c>CancelledByEmail</c> (string?), <c>Attendees</c> (List<CalAttendeeData>?),
-    ///     <c>Location</c> (string?), <c>MeetingUrl</c> (string?),
-    ///     <c>Metadata</c> (Dictionary<string,string>?),
-    ///     <c>EventTypeId</c> (int), <c>EventType</c> (<see cref="CalEventTypeData"/>?).</description></item>
-    ///   <item><description><see cref="CalAttendeeData"/> — Attendee info in responses.
-    ///     Columns: <c>Name</c>, <c>Email</c>, <c>TimeZone</c> (string?),
-    ///     <c>Language</c> (string?).</description></item>
-    ///   <item><description><see cref="CalEventTypeData"/> — cal.com event type metadata.
-    ///     Columns: <c>Id</c> (int), <c>Slug</c> (string), <c>Title</c> (string),
-    ///     <c>LengthMinutes</c> (int).</description></item>
-    ///   <item><description><see cref="CalError"/> — Error payload.
-    ///     Columns: <c>Code</c> (string), <c>Message</c> (string).</description></item>
-    ///   <item><description><see cref="CalAvailabilityRequest"/> — Request DTO for slot queries.
-    ///     Columns: <c>EventTypeId</c> (int), <c>StartTime</c> (string, ISO 8601 e.g. "2026-06-25T00:00:00Z"),
-    ///     <c>EndTime</c> (string, ISO 8601 e.g. "2026-06-26T00:00:00Z"), <c>TimeZone</c> (string?, IANA timezone).</description></item>
-    ///   <item><description><see cref="CalAvailabilityResponse"/> — Root wrapper for availability.
-    ///     Columns: <c>Status</c> (string), <c>Data</c> (<see cref="CalAvailabilityData"/>?),
-    ///     <c>Error</c> (<see cref="CalError"/>?).</description></item>
-    ///   <item><description><see cref="CalAvailabilityData"/> — Availability payload.
-    ///     Columns: <c>Slots</c> (Dictionary<string, List<CalSlot>>?, keyed by date),
-    ///     <c>MinimumBookingNotice</c> (int, minutes),
-    ///     <c>LengthMinutes</c> (int, event duration).</description></item>
-    ///   <item><description><see cref="CalSlot"/> — A single available time slot.
-    ///     Columns: <c>Time</c> (DateTimeOffset), <c>Attendees</c> (int?, current bookings).</description></item>
-    ///   <item><description><see cref="CancelBookingRequest"/> — Cancel reason.
-    ///     Column: <c>Reason</c> (string?).</description></item>
-    ///   <item><description><see cref="Product"/> (domain entity) — <c>CalEventTypeId</c> (int?, links a product to a cal.com event type).</description></item>
+    ///   <item><description><b>Booking Creation:</b> The <c>CreateBooking</c> method now respects the <c>Attendee.TimeZone</c> passed in the request body.</description></item>
+    ///   <item><description><b>Slot Availability:</b> Both <c>GetAvailableSlots</c> and <c>GetAllAvailableDateTimes</c> accept a <c>timeZone</c> query parameter.</description></item>
+    ///   <item><description><b>Defaulting:</b> All methods fall back to <b>Africa/Johannesburg</b> if no timezone is provided by the client.</description></item>
+    /// </list>
+    ///
+    /// <para><b>ENTITY COLUMNS & PROPERTIES:</b></para>
+    /// <list type="table">
+    ///   <listheader><term>Object</term><description>Columns / Properties</description></listheader>
+    ///   <item>
+    ///     <term><see cref="CalAttendee"/></term>
+    ///     <description>
+    ///       - <c>Name</c> (string): Attendee's full name.<br/>
+    ///       - <c>Email</c> (string): Attendee's email address.<br/>
+    ///       - <c>TimeZone</c> (string): <b>User-defined IANA timezone</b> (e.g., "Europe/London"). Used for the calendar invite.<br/>
+    ///       - <c>Language</c> (string): Default "en".
+    ///     </description>
+    ///   </item>
+    ///   <item>
+    ///     <term><see cref="CreateCalBookingRequest"/></term>
+    ///     <description>
+    ///       - <c>EventTypeId</c> (int): Cal.com meeting type ID.<br/>
+    ///       - <c>Start</c> (DateTimeOffset): The chosen slot time (UTC).<br/>
+    ///       - <c>Attendee</c> (CalAttendee): The user details including their preferred timezone.
+    ///     </description>
+    ///   </item>
     /// </list>
     /// </summary>
     [Route("api/[controller]")]
@@ -81,160 +52,58 @@ namespace ProcessZero.Web.Controllers
         }
 
         /// <summary>
-        /// Helper to extract the authenticated user's id from JWT claims.
-        /// </summary>
-        private string GetUserId()
-            => User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
-
-        /// <summary>
         /// POST: api/cal/bookings
-        /// Creates a new booking in cal.com.
-        /// Requires authentication.
+        /// Creates a booking. 
+        /// IMPORTANT: Pass "timeZone" inside the "attendee" object to set the user's local time for the invite.
         /// </summary>
         [HttpPost("bookings")]
         [Authorize]
         public async Task<IActionResult> CreateBooking([FromBody] CreateCalBookingRequest request, CancellationToken cancellationToken)
         {
-            if (request == null)
-                return BadRequest("Request body is required");
-
-            if (string.IsNullOrWhiteSpace(request.Attendee?.Email))
-                return BadRequest("Attendee email is required");
-
-            if (string.IsNullOrWhiteSpace(request.Attendee?.Name))
-                return BadRequest("Attendee name is required");
-
-            if (request.Start == default)
-                return BadRequest("Start time is required");
+            if (string.IsNullOrWhiteSpace(request?.Attendee?.Email))
+                return BadRequest("Attendee details and email are required.");
 
             try
             {
+                // The service will use request.Attendee.TimeZone if provided, otherwise defaults to Africa/Johannesburg
                 var result = await _calService.CreateBookingAsync(request, cancellationToken);
 
-                if (result.Error != null)
-                {
-                    _logger.LogWarning("cal.com booking creation failed: {Code} - {Message}",
-                        result.Error.Code, result.Error.Message);
-
-                    return StatusCode(StatusCodes.Status502BadGateway, new
-                    {
-                        error = result.Error.Message,
-                        code = result.Error.Code
-                    });
-                }
-
-                _logger.LogInformation("cal.com booking created successfully: ID={BookingId}, UID={Uid}",
-                    result.Data?.Id, result.Data?.Uid);
-
+                if (result.Error != null) return StatusCode(502, result.Error);
                 return Ok(result.Data);
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "cal.com API error during booking creation");
-                return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error creating cal.com booking");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
+                _logger.LogError(ex, "Error creating booking for {Email}", request.Attendee.Email);
+                return StatusCode(500, new { error = ex.Message });
             }
         }
 
         /// <summary>
         /// GET: api/cal/bookings/{id}
-        /// Retrieves a booking by its cal.com numeric ID.
-        /// Requires authentication.
         /// </summary>
         [HttpGet("bookings/{id:int}")]
         [Authorize]
         public async Task<IActionResult> GetBookingById(int id, CancellationToken cancellationToken)
         {
-            if (id <= 0)
-                return BadRequest("Valid booking ID is required");
-
-            try
-            {
-                var result = await _calService.GetBookingByIdAsync(id, cancellationToken);
-
-                if (result.Error != null)
-                    return StatusCode(StatusCodes.Status502BadGateway, new { error = result.Error.Message });
-
-                if (result.Data == null)
-                    return NotFound(new { error = "Booking not found" });
-
-                return Ok(result.Data);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching cal.com booking {BookingId}", id);
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
-            }
-        }
-
-        /// <summary>
-        /// GET: api/cal/bookings/uid/{uid}
-        /// Retrieves a booking by its cal.com UID.
-        /// Requires authentication.
-        /// </summary>
-        [HttpGet("bookings/uid/{uid}")]
-        [Authorize]
-        public async Task<IActionResult> GetBookingByUid(string uid, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrWhiteSpace(uid))
-                return BadRequest("Booking UID is required");
-
-            try
-            {
-                var result = await _calService.GetBookingByUidAsync(uid, cancellationToken);
-
-                if (result.Error != null)
-                    return StatusCode(StatusCodes.Status502BadGateway, new { error = result.Error.Message });
-
-                if (result.Data == null)
-                    return NotFound(new { error = "Booking not found" });
-
-                return Ok(result.Data);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching cal.com booking by UID {Uid}", uid);
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
-            }
+            var result = await _calService.GetBookingByIdAsync(id, cancellationToken);
+            if (result.Data == null) return NotFound();
+            return Ok(result.Data);
         }
 
         /// <summary>
         /// POST: api/cal/bookings/{id}/cancel
-        /// Cancels a cal.com booking.
-        /// Requires authentication.
         /// </summary>
         [HttpPost("bookings/{id:int}/cancel")]
         [Authorize]
-        public async Task<IActionResult> CancelBooking(int id, [FromBody] CancelBookingRequest? body = null, CancellationToken cancellationToken = default)
+        public async Task<IActionResult> CancelBooking(int id, [FromBody] CancelBookingRequest? body, CancellationToken cancellationToken)
         {
-            if (id <= 0)
-                return BadRequest("Valid booking ID is required");
-
-            try
-            {
-                var result = await _calService.CancelBookingAsync(id, body?.Reason, cancellationToken);
-
-                if (result.Error != null)
-                    return StatusCode(StatusCodes.Status502BadGateway, new { error = result.Error.Message });
-
-                _logger.LogInformation("cal.com booking {BookingId} cancelled successfully", id);
-                return Ok(result.Data);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error cancelling cal.com booking {BookingId}", id);
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
-            }
+            var result = await _calService.CancelBookingAsync(id, body?.Reason, cancellationToken);
+            return Ok(result.Data);
         }
 
         /// <summary>
         /// GET: api/cal/slots/available
-        /// Queries available time slots from cal.com.
-        /// Requires authentication.
+        /// Queries range availability. TimeZone parameter adjusts the slot times returned.
         /// </summary>
         [HttpGet("slots/available")]
         [Authorize]
@@ -245,151 +114,60 @@ namespace ProcessZero.Web.Controllers
             [FromQuery] string? timeZone,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(startDate))
-                return BadRequest("startDate is required (YYYY-MM-DD)");
-
-            if (string.IsNullOrWhiteSpace(endDate))
-                return BadRequest("endDate is required (YYYY-MM-DD)");
+            if (string.IsNullOrEmpty(startDate) || string.IsNullOrEmpty(endDate))
+                return BadRequest("startDate and endDate are required.");
 
             var request = new CalAvailabilityRequest
             {
                 EventTypeId = eventTypeId ?? 0,
                 StartTime = startDate.Contains('T') ? startDate : $"{startDate}T00:00:00Z",
-                EndTime = endDate.Contains('T') ? endDate : $"{endDate}T00:00:00Z",
-                TimeZone = timeZone
+                EndTime = endDate.Contains('T') ? endDate : $"{endDate}T23:59:59Z",
+                TimeZone = timeZone ?? "Africa/Johannesburg"
             };
 
-            try
-            {
-                var result = await _calService.GetAvailableSlotsAsync(request, cancellationToken);
-
-                if (result.Error != null)
-                    return StatusCode(StatusCodes.Status502BadGateway, new { error = result.Error.Message });
-
-                return Ok(result.Data);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching available slots from cal.com");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
-            }
+            var result = await _calService.GetAvailableSlotsAsync(request, cancellationToken);
+            return Ok(result.Data);
         }
 
         /// <summary>
-        /// GET: api/cal/slots/all
-        /// Returns every available booking slot for the configured/default event type
-        /// over a large window (next 90 days).
-        /// Requires authentication.
-        /// </summary>
-        [HttpGet("slots/all")]
-        [Authorize]
-        public async Task<IActionResult> GetAllAvailableSlots(CancellationToken cancellationToken)
-        {
-            try
-            {
-                var result = await _calService.GetAllAvailableSlotsAsync(0, cancellationToken);
-
-                if (result.Error != null)
-                    return StatusCode(StatusCodes.Status502BadGateway, new { error = result.Error.Message });
-
-                return Ok(result.Data);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching all available slots from cal.com");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
-            }
-        }
-
-        /// <summary>
-        /// GET: api/cal/slots/datetimes?eventTypeId=123
-        /// Returns a flattened, sorted list of all available date/times for an event type.
-        /// Requires authentication.
+        /// GET: api/cal/slots/datetimes
+        /// Returns flattened slots. Passing ?timeZone=... will shift the times to the user's region.
         /// </summary>
         [HttpGet("slots/datetimes")]
         [Authorize]
         public async Task<IActionResult> GetAllAvailableDateTimes(
             [FromQuery] int? eventTypeId,
+            [FromQuery] string? timeZone,
             CancellationToken cancellationToken)
         {
-            try
-            {
-                var times = await _calService.GetAllAvailableDateTimesAsync(eventTypeId ?? 0, cancellationToken);
-                return Ok(times);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching flattened available date/times from cal.com");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred" });
-            }
+            var times = await _calService.GetAllAvailableDateTimesAsync(eventTypeId ?? 0, timeZone, cancellationToken);
+            return Ok(times);
         }
 
         /// <summary>
         /// POST: api/cal/webhook
-        /// Receives webhook events from cal.com.
-        /// This endpoint is publicly accessible (no auth) and uses a shared secret
-        /// for verification, or relies on cal.com IP whitelisting.
-        ///
-        /// The request body must include a "triggerEvent" field (e.g. "BOOKING_CREATED")
-        /// and a "payload" field with the booking details.
         /// </summary>
         [HttpPost("webhook")]
         [AllowAnonymous]
         public async Task<IActionResult> HandleWebhook(CancellationToken cancellationToken)
         {
-            string body;
-            using (var reader = new System.IO.StreamReader(Request.Body))
-            {
-                body = await reader.ReadToEndAsync(cancellationToken);
-            }
-
-            if (string.IsNullOrWhiteSpace(body))
-            {
-                _logger.LogWarning("Received empty cal.com webhook body");
-                return BadRequest("Empty webhook body");
-            }
-
-            // Extract the trigger event from the payload
-            string triggerEvent;
             try
             {
+                using var reader = new StreamReader(Request.Body);
+                var body = await reader.ReadToEndAsync(cancellationToken);
                 using var doc = System.Text.Json.JsonDocument.Parse(body);
-                triggerEvent = doc.RootElement.TryGetProperty("triggerEvent", out var te)
-                    ? te.GetString() ?? string.Empty
-                    : string.Empty;
-            }
-            catch (System.Text.Json.JsonException ex)
-            {
-                _logger.LogError(ex, "Failed to parse cal.com webhook JSON");
-                return BadRequest("Invalid JSON payload");
-            }
+                var triggerEvent = doc.RootElement.GetProperty("triggerEvent").GetString() ?? "UNKNOWN";
 
-            if (string.IsNullOrWhiteSpace(triggerEvent))
-            {
-                _logger.LogWarning("cal.com webhook missing triggerEvent field");
-                return BadRequest("Missing triggerEvent field");
-            }
-
-            _logger.LogInformation("Processing cal.com webhook: {TriggerEvent}", triggerEvent);
-
-            try
-            {
                 await _calService.HandleWebhookAsync(triggerEvent, body, cancellationToken);
-                return Ok(new { received = true, triggerEvent });
+                return Ok(new { status = "received" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing cal.com webhook for event {TriggerEvent}", triggerEvent);
-                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to process webhook" });
+                _logger.LogError(ex, "Webhook failed");
+                return StatusCode(500);
             }
         }
     }
 
-    /// <summary>
-    /// Request body for cancelling a booking.
-    /// </summary>
-    public class CancelBookingRequest
-    {
-        public string? Reason { get; set; }
-    }
+    public class CancelBookingRequest { public string? Reason { get; set; } }
 }

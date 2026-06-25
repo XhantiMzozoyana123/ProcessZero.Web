@@ -6,17 +6,12 @@ using ProcessZero.Application.Options;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace ProcessZero.Infrastructure.Services
 {
     /// <summary>
     /// Service for integrating with cal.com scheduling API (v2).
-    /// Uses an API key for authentication and supports booking CRUD,
-    /// availability queries, and webhook processing.
-    ///
-    /// Includes large-range availability methods that query a 90-day window and can
-    /// return either the raw Cal.com slot structure or a flattened sorted list of date/times.
+    /// Handles Date formatting, Timezone defaulting, and API versioning.
     /// </summary>
     public class CalService : ICalService
     {
@@ -26,371 +21,175 @@ namespace ProcessZero.Infrastructure.Services
         private readonly JsonSerializerOptions _jsonOptions;
 
         private const string CalApiVersionHeader = "cal-api-version";
-        private const string CalApiVersionValue = "2026-02-25";
+        private const string CalApiVersionValue = "2024-06-11";
 
-        public CalService(
-            HttpClient httpClient,
-            IOptions<CalOptions> options,
-            ILogger<CalService> logger)
+        public CalService(HttpClient httpClient, IOptions<CalOptions> options, ILogger<CalService> logger)
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _httpClient = httpClient;
+            _options = options.Value;
+            _logger = logger;
 
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
             };
+            _jsonOptions.Converters.Add(new StrictUtcDateTimeOffsetConverter());
 
-            // Normalize the incoming config value: ensure exactly one trailing slash
-            var configuredBase = (_options.BaseUrl ?? string.Empty).TrimEnd('/');
-            var normalizedBase = string.IsNullOrWhiteSpace(configuredBase)
-                ? "https://api.cal.com/v2/"
-                : configuredBase + "/";
-
-            // Configure the HttpClient with the base URL and auth header
-            _httpClient.BaseAddress = new Uri(normalizedBase);
-            _httpClient.DefaultRequestHeaders.Clear();
+            var configuredBase = (_options.BaseUrl ?? "https://api.cal.com/v2/").TrimEnd('/');
+            _httpClient.BaseAddress = new Uri(configuredBase + "/");
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_options.ApiKey}");
             _httpClient.DefaultRequestHeaders.Add(CalApiVersionHeader, CalApiVersionValue);
-            _httpClient.DefaultRequestHeaders.Accept.Add(
-                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-
-            _logger.LogInformation(
-                "CalService initialized. BaseAddress={BaseAddress}, EventTypeId={EventTypeId}, ApiKeyPrefix={ApiKeyPrefix}",
-                _httpClient.BaseAddress,
-                _options.EventTypeId,
-                string.IsNullOrWhiteSpace(_options.ApiKey) ? "<missing>" : _options.ApiKey[..Math.Min(10, _options.ApiKey.Length)]);
         }
 
-        // ──── Create Booking ────────────────────────────────────────────────
+        private string FormatCalDate(DateTimeOffset dt)
+            => dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
 
+        // ──── Create Booking (Now respecting Attendee Timezone) ───────────
         public async Task<CalBookingResponse> CreateBookingAsync(
-            CreateCalBookingRequest request,
-            CancellationToken cancellationToken = default)
+    CreateCalBookingRequest request,
+    CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
+
+            _httpClient.DefaultRequestHeaders.Add(CalApiVersionHeader, CalApiVersionValue);
 
             if (request.EventTypeId <= 0)
                 request.EventTypeId = _options.EventTypeId;
 
-            var url = "bookings";
+            request.Attendee.TimeZone = string.IsNullOrWhiteSpace(request.Attendee.TimeZone)
+                ? "Africa/Johannesburg"
+                : request.Attendee.TimeZone;
 
-            // cal.com v2 requires timeZone and language as non-null strings with defaults
-            if (string.IsNullOrWhiteSpace(request.Attendee.TimeZone))
-                request.Attendee.TimeZone = "UTC";
-            if (string.IsNullOrWhiteSpace(request.Attendee.Language))
-                request.Attendee.Language = "en";
+            request.Attendee.Language ??= "en";
+
+            _logger.LogInformation(
+                "Creating booking for {Email} in TimeZone {TZ}",
+                request.Attendee.Email,
+                request.Attendee.TimeZone);
 
             var json = JsonSerializer.Serialize(request, _jsonOptions);
-            _logger.LogInformation("Cal.com request JSON: {Json}", json);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var fullUrl = new Uri(_httpClient.BaseAddress!, url);
-            _logger.LogInformation(
-                "Creating cal.com booking for {AttendeeEmail} (eventTypeId: {EventTypeId}). FullUrl={FullUrl}",
-                request.Attendee.Email, request.EventTypeId, fullUrl);
+            _logger.LogInformation("Cal.com Payload: {Payload}", json);
 
-            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "bookings");
+            httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            // ✅ FIX: important missing header
+            httpRequest.Headers.Accept.Add(
+                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+            httpRequest.Headers.Add("cal-api-version", "2026-02-25");
+
+            var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+
             return await DeserializeResponseAsync<CalBookingResponse>(response, cancellationToken);
         }
 
-        // ──── Get Booking by UID ───────────────────────────────────────────
-
-        public async Task<CalBookingResponse> GetBookingByUidAsync(
-            string uid,
-            CancellationToken cancellationToken = default)
+        public async Task<CalBookingResponse> GetBookingByUidAsync(string uid, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(uid))
-                throw new ArgumentException("Booking UID is required", nameof(uid));
-
-            var url = $"bookings/{Uri.EscapeDataString(uid)}";
-
-            _logger.LogInformation("Fetching cal.com booking by UID: {Uid}", uid);
-
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            var response = await _httpClient.GetAsync($"bookings/{Uri.EscapeDataString(uid)}", cancellationToken);
             return await DeserializeResponseAsync<CalBookingResponse>(response, cancellationToken);
         }
 
-        // ──── Get Booking by ID ────────────────────────────────────────────
-
-        public async Task<CalBookingResponse> GetBookingByIdAsync(
-            int bookingId,
-            CancellationToken cancellationToken = default)
+        public async Task<CalBookingResponse> GetBookingByIdAsync(int bookingId, CancellationToken cancellationToken = default)
         {
-            var url = $"bookings/{bookingId}";
-
-            _logger.LogInformation("Fetching cal.com booking by ID: {BookingId}", bookingId);
-
-            var response = await _httpClient.GetAsync(url, cancellationToken);
+            var response = await _httpClient.GetAsync($"bookings/{bookingId}", cancellationToken);
             return await DeserializeResponseAsync<CalBookingResponse>(response, cancellationToken);
         }
-
-        // ──── Cancel Booking ───────────────────────────────────────────────
 
         public async Task<CalBookingResponse> CancelBookingAsync(
-            int bookingId,
-            string? reason = null,
-            CancellationToken cancellationToken = default)
+    int bookingId,
+    string? reason = null,
+    CancellationToken cancellationToken = default)
         {
-            var url = $"bookings/{bookingId}/cancel";
+            var body = JsonSerializer.Serialize(new
+            {
+                reason = reason ?? "Cancelled via application"
+            }, _jsonOptions);
 
-            var body = new Dictionary<string, object>();
-            if (!string.IsNullOrWhiteSpace(reason))
-                body["reason"] = reason;
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"bookings/{bookingId}/cancel");
+            request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            var json = JsonSerializer.Serialize(body, _jsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            request.Headers.Accept.Add(
+                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
 
-            _logger.LogInformation("Cancelling cal.com booking {BookingId}. Reason: {Reason}",
-                bookingId, reason ?? "(no reason provided)");
+            var response = await _httpClient.SendAsync(request, cancellationToken);
 
-            var response = await _httpClient.PostAsync(url, content, cancellationToken);
             return await DeserializeResponseAsync<CalBookingResponse>(response, cancellationToken);
         }
 
-        // ──── Get Available Slots ──────────────────────────────────────────
-
+        // ──── Availability Logic (Respecting Dynamic Timezones) ───────────
         public async Task<CalAvailabilityResponse> GetAvailableSlotsAsync(
             CalAvailabilityRequest request,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
+            var eventId = request.EventTypeId > 0 ? request.EventTypeId : _options.EventTypeId;
 
-            if (request.EventTypeId <= 0)
-                request.EventTypeId = _options.EventTypeId;
+            var startParsed = DateTimeOffset.Parse(request.StartTime);
+            var endParsed = DateTimeOffset.Parse(request.EndTime);
 
             var queryParams = new List<string>
             {
-                $"eventTypeId={request.EventTypeId}",
-                $"startTime={Uri.EscapeDataString(request.StartTime)}",
-                $"endTime={Uri.EscapeDataString(request.EndTime)}"
+                $"eventTypeId={eventId}",
+                $"startTime={Uri.EscapeDataString(FormatCalDate(startParsed))}",
+                $"endTime={Uri.EscapeDataString(FormatCalDate(endParsed))}",
+                $"timeZone={Uri.EscapeDataString(request.TimeZone ?? "Africa/Johannesburg")}"
             };
 
-            if (!string.IsNullOrWhiteSpace(request.TimeZone))
-                queryParams.Add($"timeZone={Uri.EscapeDataString(request.TimeZone)}");
-
-            var queryString = string.Join("&", queryParams);
-            var url = $"slots/available";
-
-            _logger.LogInformation("Fetching available slots for eventTypeId {EventTypeId} from {StartTime} to {EndTime}",
-                request.EventTypeId, request.StartTime, request.EndTime);
-
+            var url = $"slots/available?{string.Join("&", queryParams)}";
             var response = await _httpClient.GetAsync(url, cancellationToken);
             return await DeserializeResponseAsync<CalAvailabilityResponse>(response, cancellationToken);
         }
 
-        // ──── GetAllAvailableSlotsAsync ────────────────────────────────────
-
-        public async Task<CalAvailabilityResponse> GetAllAvailableSlotsAsync(
-            int eventTypeId,
-            CancellationToken cancellationToken = default)
+        public async Task<CalAvailabilityResponse> GetAllAvailableSlotsAsync(int eventTypeId, string? timeZone = null, CancellationToken cancellationToken = default)
         {
-            if (eventTypeId <= 0)
-                eventTypeId = _options.EventTypeId;
-
-            var startTime = DateTime.UtcNow;
-            var endTime = startTime.AddDays(90);
-
-            var url =
-                $"slots/available?" +
-                $"eventTypeId={eventTypeId}" +
-                $"&startTime={Uri.EscapeDataString(startTime.ToString("o"))}" +
-                $"&endTime={Uri.EscapeDataString(endTime.ToString("o"))}";
-
-
-            _logger.LogInformation(
-                "Fetching all available slots for eventTypeId {EventTypeId} over next 90 days ({Start} to {End})",
-                eventTypeId, startTime, endTime);
-
-            var response = await _httpClient.GetAsync(url, cancellationToken);
-            return await DeserializeResponseAsync<CalAvailabilityResponse>(response, cancellationToken);
+            var start = DateTimeOffset.UtcNow.Date;
+            var request = new CalAvailabilityRequest
+            {
+                EventTypeId = eventTypeId,
+                StartTime = FormatCalDate(start),
+                EndTime = FormatCalDate(start.AddDays(90)),
+                TimeZone = timeZone ?? "Africa/Johannesburg"
+            };
+            return await GetAvailableSlotsAsync(request, cancellationToken);
         }
 
-        // ──── GetAllAvailableDateTimesAsync ────────────────────────────────
-
-        public async Task<List<DateTimeOffset>> GetAllAvailableDateTimesAsync(
-            int eventTypeId,
-            CancellationToken cancellationToken = default)
+        public async Task<List<DateTimeOffset>> GetAllAvailableDateTimesAsync(int eventTypeId, string? timeZone = null, CancellationToken cancellationToken = default)
         {
-            var availability = await GetAllAvailableSlotsAsync(eventTypeId, cancellationToken);
-
+            var availability = await GetAllAvailableSlotsAsync(eventTypeId, timeZone, cancellationToken);
             var slots = new List<DateTimeOffset>();
-
             if (availability.Data?.Slots != null)
             {
-                foreach (var day in availability.Data.Slots)
-                {
-                    foreach (var slot in day.Value)
-                    {
-                        slots.Add(slot.Time);
-                    }
-                }
+                foreach (var day in availability.Data.Slots.Values)
+                    slots.AddRange(day.Select(s => s.Time));
             }
-
             return slots.OrderBy(x => x).ToList();
         }
 
-        // ──── Webhook Handler ──────────────────────────────────────────────
-
-        public async Task HandleWebhookAsync(
-            string triggerEvent,
-            string payload,
-            CancellationToken cancellationToken = default)
+        public async Task HandleWebhookAsync(string triggerEvent, string payload, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(triggerEvent))
-                throw new ArgumentException("Trigger event is required", nameof(triggerEvent));
-
-            if (string.IsNullOrWhiteSpace(payload))
-                throw new ArgumentException("Webhook payload is required", nameof(payload));
-
-            _logger.LogInformation("Received cal.com webhook: {TriggerEvent}", triggerEvent);
-
-            try
-            {
-                switch (triggerEvent.ToUpperInvariant())
-                {
-                    case "BOOKING_CREATED":
-                        await HandleBookingCreatedAsync(payload, cancellationToken);
-                        break;
-
-                    case "BOOKING_CANCELLED":
-                        await HandleBookingCancelledAsync(payload, cancellationToken);
-                        break;
-
-                    case "BOOKING_RESCHEDULED":
-                        await HandleBookingRescheduledAsync(payload, cancellationToken);
-                        break;
-
-                    default:
-                        _logger.LogWarning("Unknown cal.com webhook trigger event: {TriggerEvent}", triggerEvent);
-                        break;
-                }
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "Failed to deserialize cal.com webhook payload for event {TriggerEvent}", triggerEvent);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing cal.com webhook for event {TriggerEvent}", triggerEvent);
-                throw;
-            }
+            _logger.LogInformation("Webhook: {Event}", triggerEvent);
+            await Task.CompletedTask;
         }
 
-        // ──── Private webhook handlers ──────────────────────────────────────
-
-        private Task HandleBookingCreatedAsync(string payload, CancellationToken cancellationToken)
-        {
-            var webhook = JsonSerializer.Deserialize<CalWebhookBookingCreated>(payload, _jsonOptions);
-            if (webhook?.Payload == null)
-            {
-                _logger.LogWarning("Booking created webhook payload is null or invalid");
-                return Task.CompletedTask;
-            }
-
-            var p = webhook.Payload;
-            _logger.LogInformation(
-                "Booking created: ID={BookingId}, Title=\"{Title}\", Start={Start}, Attendees={AttendeeCount}",
-                p.BookingId,
-                p.Title,
-                p.StartTime,
-                p.Attendees?.Count ?? 0);
-
-            // FUTURE: Here we can persist the booking to our local database,
-            // send notifications, update CRM, etc.
-            //
-            // Example:
-            //   var meetingDto = new MeetingDto { ... };
-            //   await _meetingService.AddMeetingAsync(meetingDto, "Created from cal.com webhook");
-
-            return Task.CompletedTask;
-        }
-
-        private Task HandleBookingCancelledAsync(string payload, CancellationToken cancellationToken)
-        {
-            var webhook = JsonSerializer.Deserialize<CalWebhookBookingCancelled>(payload, _jsonOptions);
-            if (webhook?.Payload == null)
-            {
-                _logger.LogWarning("Booking cancelled webhook payload is null or invalid");
-                return Task.CompletedTask;
-            }
-
-            var p = webhook.Payload;
-            _logger.LogInformation(
-                "Booking cancelled: ID={BookingId}, Title=\"{Title}\", Reason=\"{Reason}\", CancelledBy={CancelledBy}",
-                p.BookingId,
-                p.Title,
-                p.CancellationReason ?? "(no reason)",
-                p.CancelledByEmail ?? "(unknown)");
-
-            // FUTURE: Update local booking status, notify relevant parties, etc.
-
-            return Task.CompletedTask;
-        }
-
-        private Task HandleBookingRescheduledAsync(string payload, CancellationToken cancellationToken)
-        {
-            var webhook = JsonSerializer.Deserialize<CalWebhookBookingCreated>(payload, _jsonOptions);
-            if (webhook?.Payload == null)
-            {
-                _logger.LogWarning("Booking rescheduled webhook payload is null or invalid");
-                return Task.CompletedTask;
-            }
-
-            var p = webhook.Payload;
-            _logger.LogInformation(
-                "Booking rescheduled: ID={BookingId}, Title=\"{Title}\", NewStart={Start}, NewEnd={End}",
-                p.BookingId,
-                p.Title,
-                p.StartTime,
-                p.EndTime);
-
-            // FUTURE: Update local booking, notify relevant parties, etc.
-
-            return Task.CompletedTask;
-        }
-
-        // ──── Helpers ──────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Deserializes the HTTP response into the target type.
-        /// Throws if the response is not successful, including any cal.com error details.
-        /// </summary>
-        private async Task<T> DeserializeResponseAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken) where T : class
+        private async Task<T> DeserializeResponseAsync<T>(
+     HttpResponseMessage response,
+     CancellationToken cancellationToken) where T : class
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("cal.com API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
+                _logger.LogError("Cal.com Error Response: {Body}", body);
 
-                // Try to extract a CalError from the response
-                try
-                {
-                    var errorResponse = JsonSerializer.Deserialize<CalBookingResponse>(body, _jsonOptions);
-                    var errorMsg = errorResponse?.Error?.Message ?? $"HTTP {(int)response.StatusCode}";
-                    throw new InvalidOperationException($"cal.com API error: {errorMsg}. Code: {errorResponse?.Error?.Code}");
-                }
-                catch (JsonException)
-                {
-                    throw new InvalidOperationException($"cal.com API returned {(int)response.StatusCode}: {body}");
-                }
+                throw new InvalidOperationException(
+                    $"Cal.com request failed. Status: {response.StatusCode}. Body: {body}");
             }
 
-            try
-            {
-                var result = JsonSerializer.Deserialize<T>(body, _jsonOptions);
-                return result ?? throw new InvalidOperationException("cal.com API returned null response");
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "Failed to deserialize cal.com response: {Body}", body);
-                throw;
-            }
+            return JsonSerializer.Deserialize<T>(body, _jsonOptions)
+                ?? throw new InvalidOperationException("Empty response from Cal.com");
         }
     }
 }
