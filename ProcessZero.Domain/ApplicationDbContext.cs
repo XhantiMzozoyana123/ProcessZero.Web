@@ -71,16 +71,16 @@ namespace ProcessZero.Domain
                 e.Property(i => i.ExternalInvoiceId).HasMaxLength(256);
             });
 
-            // KPIs — constrain UserId
+            // KPIs — constrain UserId & PolicyName
             modelBuilder.Entity<KPI>(e =>
             {
                 e.Property(k => k.UserId).HasMaxLength(450);
             });
 
-            // KpiPolicies — UserId
             modelBuilder.Entity<KpiPolicy>(e =>
             {
                 e.Property(k => k.UserId).HasMaxLength(450);
+                e.Property(k => k.PolicyName).HasMaxLength(100);
             });
 
             // LeadLakes — constrain UserId & Email
@@ -159,6 +159,10 @@ namespace ProcessZero.Domain
                 e.HasIndex(k => new { k.UserId, k.ProductId, k.CreatedAt })
                  .HasDatabaseName("IX_KPIs_UserId_ProductId_CreatedAt")
                  .IsDescending(false, false, true);
+
+                e.HasIndex(k => new { k.UserId, k.CreatedAt })
+                 .HasDatabaseName("IX_KPIs_UserId_CreatedAt")
+                 .IsDescending(false, true);
             });
 
             // Assessments: latest per ProductId
@@ -213,6 +217,7 @@ namespace ProcessZero.Domain
             {
                 e.HasIndex(k => k.ProductId).HasDatabaseName("IX_KpiPolicies_ProductId");
                 e.HasIndex(k => k.IsActive).HasDatabaseName("IX_KpiPolicies_IsActive");
+                e.HasIndex(k => k.EffectiveFrom).HasDatabaseName("IX_KpiPolicies_EffectiveFrom");
             });
 
             // ApplicationUser: ban check on every request

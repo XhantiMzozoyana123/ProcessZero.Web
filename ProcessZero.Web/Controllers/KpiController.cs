@@ -14,14 +14,17 @@ namespace ProcessZero.Web.Controllers
     /// sales rep's performance for a product. Inherits BaseEntity which defines:
     /// Id (int), UserId (string), CreatedAt (DateTime), UpdatedAt (DateTime).
     /// - ProductId (int) [Required]
-    /// - CallOutreach (int)   — call outreach made for the day
-    /// - EmailOutreach (int)  — email outreach made for the day
-    /// - CallsMade (int)      — calls made for the day
+    /// - CallsAttempted (int) — total calls dialed/attempted for the day
+    /// - CallsCompleted (int) — calls successfully completed/talked to for the day
+    /// - EmailsSent (int) — total outreach emails sent for the day
+    /// - RepliesReceived (int) — positive email replies received for the day
     /// - MeetingsBooked (int) — meetings booked for the day
-    /// - DealSizeClosed (decimal) — deal size (amount) closed for the day
-    /// - ActiveClients (int)  — active clients used for MRR
+    /// - DealsClosed (int) — number of deals closed for the day
+    /// - RevenueClosed (decimal) — revenue (amount) closed for the day
+    /// - ActiveClients (int) — active clients used for MRR
     /// - MonthlyRecurringRevenue (decimal) — MRR derived from Contacts + Invoices
     ///
+    /// Sales pipeline tracked: Outreach → Replies → Meetings Booked → Deals Closed
     /// MRR is recalculated automatically from active client contacts and their
     /// closed invoice amounts every time a sales rep updates their KPIs.
     /// </summary>
@@ -72,23 +75,34 @@ namespace ProcessZero.Web.Controllers
 
         // ── Daily activity updates ─────────────────────────────────
 
-        [HttpPost("product/{productId:int}/call-outreach")]
-        public Task<IActionResult> AddCallOutreach(int productId, [FromBody] CountDto? dto) =>
+        // ── Daily activity updates (sales pipeline) ───────────────────
+        // Outreach layer
+        [HttpPost("product/{productId:int}/calls-attempted")]
+        public Task<IActionResult> AddCallsAttempted(int productId, [FromBody] CountDto? dto) =>
             ExecuteKpiUpdate(() => _kpiService.AddCallOutreachAsync(GetUserId(), productId, dto?.Count ?? 1));
 
-        [HttpPost("product/{productId:int}/email-outreach")]
-        public Task<IActionResult> AddEmailOutreach(int productId, [FromBody] CountDto? dto) =>
+        [HttpPost("product/{productId:int}/emails-sent")]
+        public Task<IActionResult> AddEmailsSent(int productId, [FromBody] CountDto? dto) =>
             ExecuteKpiUpdate(() => _kpiService.AddEmailOutreachAsync(GetUserId(), productId, dto?.Count ?? 1));
 
-        [HttpPost("product/{productId:int}/calls-made")]
-        public Task<IActionResult> AddCallsMade(int productId, [FromBody] CountDto? dto) =>
+        // Conversion layer
+        [HttpPost("product/{productId:int}/replies-received")]
+        public Task<IActionResult> AddRepliesReceived(int productId, [FromBody] CountDto? dto) =>
+            ExecuteKpiUpdate(() => _kpiService.AddRepliesReceivedAsync(GetUserId(), productId, dto?.Count ?? 1));
+
+        [HttpPost("product/{productId:int}/calls-completed")]
+        public Task<IActionResult> AddCallsCompleted(int productId, [FromBody] CountDto? dto) =>
             ExecuteKpiUpdate(() => _kpiService.AddCallsMadeAsync(GetUserId(), productId, dto?.Count ?? 1));
 
-        // Note: MeetingsBooked is incremented automatically on the backend by
-        // MeetingService when a meeting is created, so no endpoint is exposed for it.
+        // Meetings & deals layer
+        // Note: MeetingsBooked can be incremented automatically by MeetingService
+        // when a meeting is created, or manually via this endpoint.
+        [HttpPost("product/{productId:int}/meetings-booked")]
+        public Task<IActionResult> AddMeetingsBooked(int productId) =>
+            ExecuteKpiUpdate(() => _kpiService.AddMeetingBookedAsync(GetUserId(), productId));
 
-        [HttpPost("product/{productId:int}/deal-closed")]
-        public Task<IActionResult> AddDealClosed(int productId, [FromBody] AmountDto dto) =>
+        [HttpPost("product/{productId:int}/deals-closed")]
+        public Task<IActionResult> AddDealsClosed(int productId, [FromBody] AmountDto dto) =>
             ExecuteKpiUpdate(() => _kpiService.AddDealClosedAsync(GetUserId(), productId, dto.Amount));
 
         [HttpPost("product/{productId:int}/recalculate-mrr")]

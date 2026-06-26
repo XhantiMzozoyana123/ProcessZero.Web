@@ -1,42 +1,47 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Text;
 
 namespace ProcessZero.Domain.Entities
 {
     /// <summary>
     /// Daily performance snapshot for a sales rep on a given product.
-    /// One row is maintained per rep + product + day and updated as the rep
-    /// records their activity throughout the day.
+    /// Tracks the complete sales pipeline: outreach → replies → meetings → deals.
     /// </summary>
     public class KPI : BaseEntity
     {
         [Required]
         public int ProductId { get; set; }
 
-        // ── Daily sales rep activity ───────────────────────────────
-        // Number of call outreach attempts made for the day
-        public int CallOutreach { get; set; } = 0;
+        // ── Outreach Activity ──────────────────────────────────────
+        /// <summary>Total emails sent from campaigns for the day.</summary>
+        public int EmailsSent { get; set; } = 0;
 
-        // Number of email outreach attempts made for the day
-        public int EmailOutreach { get; set; } = 0;
+        /// <summary>Call outreach attempts made for the day.</summary>
+        public int CallsAttempted { get; set; } = 0;
 
-        // Number of calls actually made for the day
-        public int CallsMade { get; set; } = 0;
+        /// <summary>Calls actually connected for the day.</summary>
+        public int CallsCompleted { get; set; } = 0;
 
-        // Number of meetings booked for the day
+        // ── Response Tracking ──────────────────────────────────────
+        /// <summary>Number of email replies received for the day.</summary>
+        public int RepliesReceived { get; set; } = 0;
+
+        // ── Conversion Metrics ─────────────────────────────────────
+        /// <summary>Number of new meetings booked for the day.</summary>
         public int MeetingsBooked { get; set; } = 0;
 
-        // Total deal size (amount) closed for the day
-        public decimal DealSizeClosed { get; set; } = 0;
+        /// <summary>Number of deals closed for the day.</summary>
+        public int DealsClosed { get; set; } = 0;
 
-        // ── MRR tracking (derived from Contacts + Invoices) ────────
-        // Number of active clients used to calculate MRR.
+        /// <summary>Total dollar amount closed from deals for the day.</summary>
+        public decimal RevenueClosed { get; set; } = 0;
+
+        // ── Pipeline Health ────────────────────────────────────────
+        /// <summary>Number of active clients used for MRR calculation.</summary>
         public int ActiveClients { get; set; } = 0;
 
-        // Monthly Recurring Revenue, recalculated from active clients and
-        // the amounts they have closed on every time KPIs are updated.
+        /// <summary>Monthly Recurring Revenue from active clients.</summary>
         public decimal MonthlyRecurringRevenue { get; set; } = 0;
     }
 }

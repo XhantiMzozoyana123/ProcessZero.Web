@@ -10,19 +10,29 @@ namespace ProcessZero.Web.Controllers
     /// Controller for managing KPI policies.
     ///
     /// Entities referenced:
-    /// - KpiPolicy (inherits BaseEntity) — defines the MRR target for a product/rep
+    /// - KpiPolicy (inherits BaseEntity) — defines the performance targets and
+    ///   consequences for a product/rep
     ///   - Id (int), UserId (string), CreatedAt (DateTime), UpdatedAt (DateTime)
     ///   - ProductId (int?)
+    ///   - PolicyName (string) — readable name for the policy tier
     ///   - EffectiveFrom (DateTime), EffectiveTo (DateTime?)
     ///   - IsActive (bool)
-    ///   - TargetMRR (decimal)
-    ///   - GracePeriodDays (int), AutoFreezeOnBreach (bool)
+    ///   - DailyEmailsTarget (int), DailyCallsTarget (int)
+    ///   - MinimumReplyRate (decimal), WeeklyMeetingsTarget (int)
+    ///   - MonthlyRevenueTarget (decimal), MonthlyRecurringRevenueTarget (decimal)
+    ///   - PerformanceTolerance (decimal) — allowed underperformance buffer (e.g. 0.10 = 10%)
+    ///   - ConsequenceLevel (enum: None, Warning, Freeze, Suspend)
+    ///   - ConsequenceOnBreach (int) — mapped to ConsequenceLevel enum
+    ///   - ManagerApprovalRequiredToUnfreeze (bool)
     ///
     /// - KPI (inherits BaseEntity) — daily snapshot of a sales rep's performance
     ///   - ProductId (int)
-    ///   - CallOutreach (int), EmailOutreach (int), CallsMade (int)
-    ///   - MeetingsBooked (int), DealSizeClosed (decimal)
+    ///   - CallsAttempted (int), CallsCompleted (int), EmailsSent (int)
+    ///   - RepliesReceived (int), MeetingsBooked (int)
+    ///   - DealsClosed (int), RevenueClosed (decimal)
     ///   - ActiveClients (int), MonthlyRecurringRevenue (decimal)
+    ///
+    /// Sales pipeline tracked: Outreach → Replies → Meetings → Deals Closed
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]

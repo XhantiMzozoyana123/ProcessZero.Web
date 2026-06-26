@@ -294,6 +294,15 @@ namespace ProcessZero.Application.Constants
             return template.Replace("{CONTENT}", contentHtml ?? string.Empty);
         }
 
+        private static string GetConsequenceDisplay(ConsequenceLevel level) => level switch
+        {
+            ConsequenceLevel.None => "None",
+            ConsequenceLevel.Warning => "Warning",
+            ConsequenceLevel.Freeze => "Freeze account",
+            ConsequenceLevel.Suspend => "Suspend account",
+            _ => level.ToString()
+        };
+
         /// <summary>
         /// Congratulate a user for passing an assessment.
         /// </summary>
@@ -858,8 +867,10 @@ namespace ProcessZero.Application.Constants
   <p><strong>Effective From:</strong> {policy.EffectiveFrom:yyyy-MM-dd}</p>
   <p><strong>Effective To:</strong> {(policy.EffectiveTo.HasValue ? policy.EffectiveTo.Value.ToString("yyyy-MM-dd") : "N/A")}</p>
   <p><strong>Active:</strong> {policy.IsActive}</p>
-  <p><strong>Target MRR:</strong> {policy.TargetMRR:C}</p>
-  <p style=""margin-bottom:0;""><strong>Consequences:</strong> Grace period {policy.GracePeriodDays} days &mdash; Auto-freeze on breach: {policy.AutoFreezeOnBreach}</p>
+  <p><strong>Monthly Revenue Target:</strong> {policy.MonthlyRevenueTarget:C}</p>
+  <p><strong>Monthly Recurring Revenue Target:</strong> {policy.MonthlyRecurringRevenueTarget:C}</p>
+  <p><strong>Tolerance:</strong> {policy.PerformanceTolerance}%</p>
+  <p style=""margin-bottom:0;""><strong>Consequences:</strong> {GetConsequenceDisplay(policy.ConsequenceOnBreach)} &nbsp;&mdash;&nbsp; Grace period {policy.GracePeriodDays} days</p>
 </div>
 
 {noteText}
@@ -897,8 +908,10 @@ namespace ProcessZero.Application.Constants
   <p><strong>Effective From:</strong> {policy.EffectiveFrom:yyyy-MM-dd}</p>
   <p><strong>Effective To:</strong> {(policy.EffectiveTo.HasValue ? policy.EffectiveTo.Value.ToString("yyyy-MM-dd") : "N/A")}</p>
   <p><strong>Active:</strong> {policy.IsActive}</p>
-  <p><strong>Updated Target MRR:</strong> {policy.TargetMRR:C}</p>
-  <p style=""margin-bottom:0;""><strong>Consequences:</strong> Grace period {policy.GracePeriodDays} days &mdash; Auto-freeze on breach: {policy.AutoFreezeOnBreach}</p>
+  <p><strong>Monthly Revenue Target:</strong> {policy.MonthlyRevenueTarget:C}</p>
+  <p><strong>Monthly Recurring Revenue Target:</strong> {policy.MonthlyRecurringRevenueTarget:C}</p>
+  <p><strong>Tolerance:</strong> {policy.PerformanceTolerance}%</p>
+  <p style=""margin-bottom:0;""><strong>Consequences:</strong> {GetConsequenceDisplay(policy.ConsequenceOnBreach)} &nbsp;&mdash;&nbsp; Grace period {policy.GracePeriodDays} days</p>
 </div>
 
 {noteText}

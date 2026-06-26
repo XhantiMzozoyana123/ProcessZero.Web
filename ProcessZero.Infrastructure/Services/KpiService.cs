@@ -19,19 +19,22 @@ namespace ProcessZero.Infrastructure.Services
         }
 
         public Task AddCallOutreachAsync(string userId, int productId, int count = 1)
-            => AddKpiIncrementAsync(userId, productId, callOutreach: count);
+            => AddKpiIncrementAsync(userId, productId, callsAttempted: count);
 
         public Task AddEmailOutreachAsync(string userId, int productId, int count = 1)
-            => AddKpiIncrementAsync(userId, productId, emailOutreach: count);
+            => AddKpiIncrementAsync(userId, productId, emailsSent: count);
+
+        public Task AddRepliesReceivedAsync(string userId, int productId, int count = 1)
+            => AddKpiIncrementAsync(userId, productId, repliesReceived: count);
 
         public Task AddCallsMadeAsync(string userId, int productId, int count = 1)
-            => AddKpiIncrementAsync(userId, productId, callsMade: count);
+            => AddKpiIncrementAsync(userId, productId, callsCompleted: count);
 
         public Task AddMeetingBookedAsync(string userId, int productId)
             => AddKpiIncrementAsync(userId, productId, meetingsBooked: 1);
 
         public Task AddDealClosedAsync(string userId, int productId, decimal amount)
-            => AddKpiIncrementAsync(userId, productId, dealSizeClosed: amount);
+            => AddKpiIncrementAsync(userId, productId, revenueClosed: amount);
 
         /// <summary>
         /// Finds (or creates) the daily KPI row for the rep + product, applies the
@@ -40,19 +43,21 @@ namespace ProcessZero.Infrastructure.Services
         private async Task AddKpiIncrementAsync(
             string userId,
             int productId,
-            int callOutreach = 0,
-            int emailOutreach = 0,
-            int callsMade = 0,
+            int callsAttempted = 0,
+            int emailsSent = 0,
+            int repliesReceived = 0,
+            int callsCompleted = 0,
             int meetingsBooked = 0,
-            decimal dealSizeClosed = 0)
+            decimal revenueClosed = 0)
         {
             var kpi = await GetOrCreateTodayKpiAsync(userId, productId);
 
-            kpi.CallOutreach += callOutreach;
-            kpi.EmailOutreach += emailOutreach;
-            kpi.CallsMade += callsMade;
+            kpi.CallsAttempted += callsAttempted;
+            kpi.EmailsSent += emailsSent;
+            kpi.RepliesReceived += repliesReceived;
+            kpi.CallsCompleted += callsCompleted;
             kpi.MeetingsBooked += meetingsBooked;
-            kpi.DealSizeClosed += dealSizeClosed;
+            kpi.RevenueClosed += revenueClosed;
             kpi.UpdatedAt = DateTime.UtcNow;
 
             await ApplyMrrAsync(userId, productId, kpi);
@@ -124,7 +129,7 @@ namespace ProcessZero.Infrastructure.Services
         {
             return await _context.KPIs
                 .Where(k => k.UserId == userId && k.ProductId == productId)
-                .SumAsync(k => k.DealSizeClosed);
+                .SumAsync(k => k.RevenueClosed);
         }
     }
 }
