@@ -39,6 +39,11 @@ namespace ProcessZero.Application.Interfaces
         /// </summary>
         Task<List<SubmissionResultDto>> GetAllMyResultsAsync(CancellationToken cancellationToken = default);
 
+
+        Task<SubmissionResultDto?> GetMyUsersResultAsync(int productId, string userId, CancellationToken cancellationToken = default);
+
+        Task<List<SubmissionResultDto>> GetAllMyUsersAsync(CancellationToken cancellationToken = default);
+
         Task<AssessmentDto?> GetAssessmentForAdminAsync(int productId, CancellationToken cancellationToken = default);
         /// <summary>
         /// Admin: retrieve the latest assessment for all products (including global) for management UI.

@@ -375,5 +375,46 @@ namespace ProcessZero.Infrastructure.Services
                 Passed = s.Passed
             }).ToList();
         }
+
+        public async Task<SubmissionResultDto?> GetMyUsersResultAsync(int productId, string userId, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(userId))
+                return null;
+
+            var submission = await _context.AssessmentSubmissions
+                .AsNoTracking()
+                .Where(s => s.ProductId == productId && s.UserId == userId)
+                .OrderByDescending(s => s.SubmittedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (submission == null)
+                return null;
+
+            return new SubmissionResultDto
+            {
+                ProductId = submission.ProductId,
+                Score = submission.Score,
+                Total = submission.Total,
+                Percentage = submission.Percentage,
+                Passed = submission.Passed
+            };
+        }
+
+        public async Task<List<SubmissionResultDto>> GetAllMyUsersAsync(CancellationToken cancellationToken = default)
+        {
+            var submissions = await _context.AssessmentSubmissions
+                .AsNoTracking()
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            return submissions.Select(s => new SubmissionResultDto
+            {
+                ProductId = s.ProductId,
+                Score = s.Score,
+                Total = s.Total,
+                Percentage = s.Percentage,
+                Passed = s.Passed
+            }).ToList();
+        }
     }
 }

@@ -91,6 +91,32 @@ namespace ProcessZero.Web.Controllers
         }
 
         // ========================
+        // ADMIN - GET ALL USERS RESULTS
+        // ========================
+
+        [Authorize(Policy = "Admin")]
+        [HttpGet("admin/global/result/{userId}")]
+        public async Task<IActionResult> GeUsersGlobalResult(string userId, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(userId))
+                return BadRequest("UserId is required.");
+
+            var result = await _assessmentService.GetMyUsersResultAsync(0, userId, cancellationToken);
+            if (result == null)
+                return NotFound($"User {userId} has not submitted the global assessment yet.");
+
+            return Ok(result);
+        }
+
+        [Authorize(Policy = "Admin")]
+        [HttpGet("admin/results")]
+        public async Task<IActionResult> GetAllUsersResults(CancellationToken cancellationToken)
+        {
+            var results = await _assessmentService.GetAllMyUsersAsync(cancellationToken);
+            return Ok(results);
+        }
+
+        // ========================
         // ADMIN - MANAGEMENT
         // ========================
 
