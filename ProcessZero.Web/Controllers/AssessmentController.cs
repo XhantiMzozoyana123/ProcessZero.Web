@@ -91,7 +91,7 @@ namespace ProcessZero.Web.Controllers
         }
 
         // ========================
-        // ADMIN - GET ALL USERS RESULTS
+        // ADMIN - USERS RESULTS (includes UserId)
         // ========================
 
         [Authorize(Policy = "Admin")]

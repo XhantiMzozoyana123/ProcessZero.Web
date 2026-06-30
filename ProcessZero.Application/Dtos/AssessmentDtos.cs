@@ -67,6 +67,7 @@ namespace ProcessZero.Application.Dtos
 
     public class SubmissionResultDto
     {
+        public string UserId { get; set; } = string.Empty;
         public int ProductId { get; set; }
         public int Score { get; set; }
         public int Total { get; set; }

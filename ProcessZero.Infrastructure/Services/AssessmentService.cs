@@ -368,6 +368,7 @@ namespace ProcessZero.Infrastructure.Services
 
             return submissions.Select(s => new SubmissionResultDto
             {
+                UserId = s.UserId,
                 ProductId = s.ProductId,
                 Score = s.Score,
                 Total = s.Total,
@@ -392,6 +393,7 @@ namespace ProcessZero.Infrastructure.Services
 
             return new SubmissionResultDto
             {
+                UserId = submission.UserId,
                 ProductId = submission.ProductId,
                 Score = submission.Score,
                 Total = submission.Total,
@@ -409,6 +411,7 @@ namespace ProcessZero.Infrastructure.Services
 
             return submissions.Select(s => new SubmissionResultDto
             {
+                UserId = s.UserId,
                 ProductId = s.ProductId,
                 Score = s.Score,
                 Total = s.Total,
