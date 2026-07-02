@@ -162,6 +162,7 @@ builder.Services.AddScoped<IBankAccountService, BankAccountService>();
 builder.Services.AddScoped<IContactService, ContactService>();
 builder.Services.AddScoped<ILeadLakeService, LeadLakeService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IEmailBlasterService, EmailBlasterService>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();

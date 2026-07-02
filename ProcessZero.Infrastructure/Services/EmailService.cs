@@ -49,10 +49,13 @@ namespace ProcessZero.Infrastructure.Services
             var fromAddress = new MailAddress(fromEmail, fromName);
             var toAddress = new MailAddress(emailDto.RecipientEmail, emailDto.RecipientName ?? string.Empty);
 
+            var subject = emailDto.Subject.Replace("[name]", emailDto.RecipientName ?? string.Empty);
+            var body = emailDto.Body.Replace("[name]", emailDto.RecipientName ?? string.Empty);
+
             using var message = new MailMessage(fromAddress, toAddress)
             {
-                Subject = emailDto.Subject ?? string.Empty,
-                Body = emailDto.Body ?? string.Empty,
+                Subject = subject,
+                Body = body,
                 IsBodyHtml = true
             };
 
