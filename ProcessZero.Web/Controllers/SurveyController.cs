@@ -8,121 +8,95 @@ namespace ProcessZero.Web.Controllers
     /// <summary>
     /// Market Research Survey Management API
     /// 
-    /// ENTITIES INVOLVED:
+    /// ╔══════════════════════════════════════════════════════════════════════════════╗
+    /// ║                          CRITICAL SYSTEM DESIGN                              ║
+    /// ╚══════════════════════════════════════════════════════════════════════════════╝
+    /// 
+    /// Every survey ALWAYS includes 7 mandatory contact information questions:
+    ///   Questions[0]: Email Address (REQUIRED)
+    ///   Questions[1]: First Name (REQUIRED)
+    ///   Questions[2]: Last Name (REQUIRED)
+    ///   Questions[3]: Phone Number (REQUIRED)
+    ///   Questions[4]: Company (optional)
+    ///   Questions[5]: Job Title (optional)
+    ///   Questions[6]: Industry (optional)
+    ///   Questions[7+]: Admin-provided business/pain point questions
+    /// 
+    /// These base contact questions are AUTOMATICALLY PREPENDED to every survey
+    /// when an admin uploads business questions via PUT /api/survey/admin.
+    /// 
+    /// RESPONDENT SUBMISSION FORMAT:
+    /// =============================
+    /// Client sends answers array with ONE response per question:
+    ///   POST /api/survey/submit
+    ///   {
+    ///     "answers": [
+    ///       "jane@company.com",                          // [0] Email
+    ///       "Jane",                                      // [1] FirstName
+    ///       "Doe",                                       // [2] LastName
+    ///       "+1-555-0123",                               // [3] Phone
+    ///       "Acme Corp",                                 // [4] Company
+    ///       "Operations Manager",                        // [5] Job
+    ///       "Manufacturing",                             // [6] Industry
+    ///       "Our scheduling process is completely manual",  // [7] Q1
+    ///       "We use Excel and email spreadsheets",          // [8] Q2
+    ///       "$15,000/month in labor costs"                  // [9] Q3
+    ///     ]
+    ///   }
+    /// 
+    /// DATA EXTRACTION & STORAGE:
+    /// ==========================
+    /// SurveyService.SubmitResponseAsync:
+    ///   1. Validates answers[0-6] contains valid contact info
+    ///   2. Extracts contact from answers: email, firstName, lastName, phone, company, job, industry
+    ///   3. Creates/finds SurveyRespondent by email (prevents duplicates)
+    ///   4. Stores FULL answers array (0-6 contact + 7+ business) in SurveyResponse.AnswersJson
+    ///   5. Calls ILLMService with full context (contact + business answers)
+    ///   6. If LLM returns "QUALIFY": Creates LeadLake record for sales outreach
+    ///   7. Returns SurveyResponseResultDto with contact as separate fields
+    /// 
+    /// ENTITIES & TABLES:
     /// ==================
     /// 
-    /// 1. SurveyQuestion (Domain Entity)
-    ///    Database Table: SurveyQuestions
-    ///    Purpose: Stores the global survey definition
-    ///    Columns:
-    ///      - Id: int (Primary Key)
-    ///      - Title: string (max 255) - Survey name/heading
-    ///      - Description: string (max 1000) - Survey introduction/context
-    ///      - QuestionsJson: longtext - Serialized JSON array of SurveyQuestionDto objects
-    ///      - UploadedAt: datetime - When survey was created/updated
-    ///      - UserId: string - Admin user who uploaded the survey
-    ///      - CreatedAt/UpdatedAt: datetime - EF Core tracking
-    ///    Index: IX_SurveyQuestions_UploadedAt (for fast retrieval of latest survey)
+    /// 1. SurveyQuestions Table
+    ///    - Stores global survey definition with ALL questions (contact + business)
+    ///    - QuestionsJson: Serialized SurveyDto with Questions array
+    ///    - Latest survey retrieved by OrderByDescending(UploadedAt)
     /// 
-    /// 2. SurveyRespondent (Domain Entity)
-    ///    Database Table: SurveyRespondents
-    ///    Purpose: Stores contact information for survey participants
-    ///    Columns:
-    ///      - Id: int (Primary Key)
-    ///      - Email: string (max 255, unique) - Respondent email address
-    ///      - FirstName: string (max 100) - Respondent first name
-    ///      - LastName: string (max 100) - Respondent last name
-    ///      - Phone: string (max 20) - Respondent phone number
-    ///      - Company: string (max 255) - Organization name
-    ///      - Job: string (max 255) - Job title/role
-    ///      - Industry: string (max 100) - Industry classification (used for LeadLake mapping)
-    ///      - UserId: string (FK to AspNetUsers) - Associated system user
-    ///      - CreatedAt/UpdatedAt: datetime - EF Core tracking
-    ///    Indexes: 
-    ///      - IX_SurveyRespondents_Email (quick lookup by email)
-    ///      - IX_SurveyRespondents_UserId (user-specific queries)
+    /// 2. SurveyRespondents Table
+    ///    - Email: Unique identifier (prevents duplicate contacts)
+    ///    - FirstName, LastName, Phone: Required contact fields
+    ///    - Company, Job, Industry: Optional contact fields
+    ///    - Populated when user submits survey (contact extracted from answers[0-6])
     /// 
-    /// 3. SurveyResponse (Domain Entity)
-    ///    Database Table: SurveyResponses
-    ///    Purpose: Stores individual survey submissions and responses
-    ///    Columns:
-    ///      - Id: int (Primary Key)
-    ///      - SurveyRespondentId: int (FK to SurveyRespondents) - Links to respondent
-    ///      - AnswersJson: longtext - Serialized JSON array of response strings
-    ///      - SubmittedAt: datetime - When the response was submitted
-    ///      - UserId: string (FK to AspNetUsers) - System user who submitted
-    ///      - CreatedAt/UpdatedAt: datetime - EF Core tracking
-    ///    Index: IX_SurveyResponses_RespondentId_SubmittedAt (composite, for efficient lookup + sorting)
-    ///    FK Constraint: CASCADE delete with SurveyRespondent
+    /// 3. SurveyResponses Table
+    ///    - SurveyRespondentId: Foreign key to respondent
+    ///    - AnswersJson: Serialized full answers array (indices 0-6 contact + 7+ business)
+    ///    - SubmittedAt: Timestamp of submission
     /// 
-    /// 4. LeadLake (Domain Entity) [Auto-populated via LLM validation]
-    ///    Database Table: LeadLakes
-    ///    Purpose: Stores qualified leads from survey respondents
-    ///    Populated When: SurveyService.SubmitResponseAsync() runs LLM validation
-    ///    Columns:
-    ///      - Id: int (Primary Key)
-    ///      - FirstName/LastName/Email/Phone/Company/Job: string - Contact details from SurveyRespondent
-    ///      - Location: string - Geographic location (optional from survey)
-    ///      - Industry: LeadLakeIndustry enum - Mapped from SurveyRespondent.Industry string
-    ///      - Intent: LeadIntent enum - Set to "High" for survey qualifiers
-    ///      - UserId: string (FK to AspNetUsers)
-    ///      - CreatedAt/UpdatedAt: datetime - EF Core tracking
+    /// 4. LeadLakes Table (Auto-populated)
+    ///    - Created ONLY if LLM qualification passes
+    ///    - Contact details copied from SurveyRespondent
+    ///    - Industry: Mapped from string to LeadLakeIndustry enum
+    ///    - Intent: Set to "High" (survey respondents show high intent)
     /// 
-    /// DATA FLOW WITH DTOs:
-    /// ====================
+    /// ADMIN WORKFLOW:
+    /// ===============
+    /// 1. Admin creates business questions: "What's your biggest challenge?", etc.
+    /// 2. Admin POSTs to PUT /api/survey/admin with SurveyDto
+    /// 3. Service automatically prepends 7 contact questions
+    /// 4. Complete survey stored in database
+    /// 5. Respondents access via GET /api/survey (see all 14 questions: 7 contact + 7 business)
     /// 
-    /// FLOW 1: Upload Survey (Admin)
-    ///   Admin sends: SurveyDto
-    ///     - Title: "Market Research: B2B SaaS Pain Points"
-    ///     - Description: "Help us understand your business challenges"
-    ///     - Questions: List[SurveyQuestionDto] where each has:
-    ///       * Text: "What is your biggest operational challenge?"
-    ///       * IsRequired: true
-    ///   → Serialized to SurveyQuestion.QuestionsJson in database
-    ///   → Retrieved via GetSurveyForAdmin() for admin editing
-    /// 
-    /// FLOW 2: Respondent Views Survey (Public)
-    ///   GET /api/survey returns: SurveyClientDto
-    ///     - Same structure as SurveyDto (title, description, questions)
-    ///     - Deserialized from SurveyQuestion.QuestionsJson
-    /// 
-    /// FLOW 3: Submit Survey Response (Public) → AI-GATED LEAD QUALIFICATION
-    ///   Client sends: SurveyResponseSubmissionDto containing:
-    ///     - Respondent: SurveyRespondentSubmissionDto
-    ///       * Email: "jane@company.com"
-    ///       * FirstName/LastName/Phone/Company/Job/Industry
-    ///     - Answers: List[string] = ["Our scheduling is manual and error-prone", "Excel spreadsheets", ...]
-    ///   
-    ///   Service processes:
-    ///     1. Create/retrieve SurveyRespondent row (unique by email)
-    ///     2. Create SurveyResponse row with AnswersJson = serialized answers
-    ///     3. Call ILLMService to analyze Respondent + Answers for pain points
-    ///     4. If LLM returns "QUALIFY": Create LeadLake row for sales outreach
-    ///     5. If LLM returns "REJECT": Only store response, no lead created
-    ///   
-    ///   Returns: SurveyResponseResultDto
-    ///     - Id: Response record ID
-    ///     - Email/FirstName/LastName/Phone/Company/Job/Industry: From SurveyRespondent
-    ///     - Answers: Echo of submitted answers
-    ///     - SubmittedAt: Timestamp
-    /// 
-    /// FLOW 4: Admin Reviews Responses (Admin)
-    ///   GET /api/survey/admin/responses returns: SurveySummaryDto
-    ///     - Title: From SurveyQuestion
-    ///     - TotalResponses: Count of SurveyResponse rows
-    ///     - Responses: List[SurveyResponseResultDto] - All submissions with respondent info
-    ///     - CollectedFrom/CollectedTo: Date range of submissions
-    ///   
-    ///   GET /api/survey/admin/responses/{id} returns: SurveyResponseResultDto
-    ///     - Single response detail for deep-dive analysis
-    ///
-    /// KEY DESIGN PATTERNS:
-    /// ====================
-    /// • Global Single Survey: One survey per deployment (no ProductId)
-    /// • LLM Qualification: Survey responses auto-filtered via AI for high-quality leads
-    /// • JSON Serialization: Questions and Answers stored as JSON for flexibility
-    /// • Async/Await: All operations support CancellationToken for graceful shutdown
-    /// • Error Resilience: LLM failure does not block survey submission
+    /// PUBLIC RESPONDENT WORKFLOW:
+    /// ===========================
+    /// 1. Respondent GETs /api/survey (receives all questions including contact)
+    /// 2. Frontend renders all questions in order
+    /// 3. Respondent fills contact info AND business pain point answers
+    /// 4. POSTs single answers array with 14 values to /api/survey/submit
+    /// 5. Backend extracts contact, creates respondent, stores response
+    /// 6. LLM analyzes answers + contact context
+    /// 7. If qualified, added to LeadLake for sales outreach
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
@@ -170,31 +144,50 @@ namespace ProcessZero.Web.Controllers
         /// <summary>
         /// Accepts and processes survey responses from respondents.
         /// 
+        /// CRITICAL: The answers array MUST include contact information in the first 7 positions.
+        /// 
         /// Input: SurveyResponseSubmissionDto
-        ///   - Respondent: SurveyRespondentSubmissionDto
-        ///     * Email: Must match for duplicate detection
-        ///     * FirstName, LastName, Phone, Company, Job, Industry: Contact details
-        ///   - Answers: List[string] with one answer per question
+        ///   {
+        ///     "answers": [
+        ///       "jane@company.com",                          // [0] Email (REQUIRED)
+        ///       "Jane",                                      // [1] FirstName (REQUIRED)
+        ///       "Doe",                                       // [2] LastName (REQUIRED)
+        ///       "+1-555-0123",                               // [3] Phone (REQUIRED)
+        ///       "Acme Corp",                                 // [4] Company (optional)
+        ///       "Operations Manager",                        // [5] Job (optional)
+        ///       "Manufacturing",                             // [6] Industry (optional)
+        ///       "Our scheduling process is manual",          // [7+] Business question answers
+        ///       "We use Excel and email",
+        ///       "$15,000/month in labor costs"
+        ///     ]
+        ///   }
         /// 
         /// Process:
-        ///   1. Creates/retrieves SurveyRespondent row (unique by email)
-        ///   2. Creates SurveyResponse row with:
-        ///      - AnswersJson: Serialized list of answers
+        ///   1. Validates answers[0-6] contains all required contact info
+        ///   2. Extracts contact: email, firstName, lastName, phone, company, job, industry
+        ///   3. Creates or retrieves SurveyRespondent (unique by email)
+        ///   4. Creates SurveyResponse row with:
+        ///      - AnswersJson: FULL answers array (0-6 contact + 7+ business)
         ///      - SubmittedAt: Current UTC timestamp
-        ///   3. Calls ILLMService.GenerateTextAsync() to validate pain points
-        ///   4. If qualified, adds SurveyRespondent to LeadLake table
-        ///   5. If not qualified or LLM fails, response still saved
+        ///      - SurveyRespondentId: Foreign key to respondent
+        ///   5. Calls ILLMService.GenerateTextAsync() with contact + business answers
+        ///   6. If LLM returns "QUALIFY": Adds respondent to LeadLake table
+        ///   7. If LLM returns "REJECT" or error: Response still saved, no lead created
         /// 
         /// Returns: SurveyResponseResultDto
         ///   - Id: SurveyResponse.Id
-        ///   - Email, Name, Company, Job, Industry: From SurveyRespondent
-        ///   - Answers: Echo of submitted answers
-        ///   - SubmittedAt: Record timestamp
+        ///   - Email, FirstName, LastName, Phone, Company, Job, Industry: From extracted contact
+        ///   - Answers: Business question answers ONLY (indices 7+)
+        ///   - SubmittedAt: Response submission timestamp
         /// 
         /// Database Tables Modified:
-        ///   - SurveyRespondents: INSERT (if new email) or SELECT (if existing)
-        ///   - SurveyResponses: INSERT
-        ///   - LeadLakes: INSERT (conditional, if LLM qualifies)
+        ///   - SurveyRespondents: INSERT new (if email not found) or use existing
+        ///   - SurveyResponses: INSERT (stores full answers including contact)
+        ///   - LeadLakes: INSERT (conditional, only if LLM qualifies)
+        /// 
+        /// Error Cases:
+        ///   400 Bad Request: Insufficient answers, missing required contact fields
+        ///   404 Not Found: No survey uploaded yet
         /// </summary>
         [HttpPost("submit")]
         public async Task<IActionResult> SubmitResponse([FromBody] SurveyResponseSubmissionDto submission, CancellationToken cancellationToken)

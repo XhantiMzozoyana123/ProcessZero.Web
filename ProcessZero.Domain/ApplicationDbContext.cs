@@ -144,30 +144,6 @@ namespace ProcessZero.Domain
                 e.Property(r => r.UserId).HasMaxLength(450);
             });
 
-            // Research — UserId
-            modelBuilder.Entity<ResearchQuestion>(e =>
-            {
-                e.Property(r => r.UserId).HasMaxLength(450);
-                e.Property(r => r.Title).HasMaxLength(200);
-            });
-
-            modelBuilder.Entity<ResearchContact>(e =>
-            {
-                e.Property(r => r.UserId).HasMaxLength(450);
-                e.Property(r => r.Email).HasMaxLength(256);
-                e.Property(r => r.FirstName).HasMaxLength(100);
-                e.Property(r => r.LastName).HasMaxLength(100);
-                e.Property(r => r.Phone).HasMaxLength(20);
-                e.Property(r => r.Company).HasMaxLength(255);
-                e.Property(r => r.Job).HasMaxLength(100);
-                e.Property(r => r.Industry).HasMaxLength(100);
-            });
-
-            modelBuilder.Entity<ResearchAnswer>(e =>
-            {
-                e.Property(r => r.UserId).HasMaxLength(450);
-            });
-
             // Inboxes — UserId
             modelBuilder.Entity<Inbox>(e =>
             {
@@ -254,27 +230,6 @@ namespace ProcessZero.Domain
                  .HasForeignKey(r => r.SurveyRespondentId);
             });
 
-            // Research: latest per ProductId and latest submission per UserId + ProductId
-            modelBuilder.Entity<ResearchQuestion>(e =>
-            {
-                e.HasIndex(r => new { r.ProductId, r.UploadedAt })
-                 .HasDatabaseName("IX_ResearchQuestions_ProductId_UploadedAt")
-                 .IsDescending(false, true);
-            });
-
-            modelBuilder.Entity<ResearchContact>(e =>
-            {
-                e.HasIndex(r => r.UserId).HasDatabaseName("IX_ResearchContacts_UserId");
-                e.HasIndex(r => r.Email).HasDatabaseName("IX_ResearchContacts_Email");
-                e.HasIndex(r => r.ProductId).HasDatabaseName("IX_ResearchContacts_ProductId");
-            });
-
-            modelBuilder.Entity<ResearchAnswer>(e =>
-            {
-                e.HasIndex(r => new { r.UserId, r.ProductId, r.SubmittedAt })
-                 .HasDatabaseName("IX_ResearchAnswers_UserId_ProductId_SubmittedAt")
-                 .IsDescending(false, false, true);
-            });
 
             // LeadLakes: filtered by UserId, Email
             modelBuilder.Entity<LeadLake>(e =>
@@ -471,12 +426,6 @@ namespace ProcessZero.Domain
         public DbSet<SurveyResponse> SurveyResponses { get; set; }
 
         public DbSet<SurveyRespondent> SurveyRespondents { get; set; }
-
-        public DbSet<ResearchAnswer> ResearchAnswers { get; set; }
-
-        public DbSet<ResearchQuestion> ResearchQuestions { get; set; }
-
-        public DbSet<ResearchContact> ResearchContacts { get; set; }
 
         public DbSet<RelayEmailAccount> RelayEmailAccounts { get; set; }
 

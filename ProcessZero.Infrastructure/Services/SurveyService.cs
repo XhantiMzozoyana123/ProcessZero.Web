@@ -20,6 +20,64 @@ namespace ProcessZero.Infrastructure.Services
             WriteIndented = true
         };
 
+        /// <summary>
+        /// Base contact information questions that are ALWAYS prepended to every survey.
+        /// These are mandatory for lead qualification and LLM analysis.
+        /// Indices 0-6 in the final survey Questions array.
+        /// </summary>
+        private static readonly List<SurveyQuestionDto> BASE_CONTACT_QUESTIONS = new()
+        {
+            new SurveyQuestionDto
+            {
+                Id = 1,
+                Text = "Email Address",
+                IsRequired = true,
+                Category = QuestionCategory.Contact
+            },
+            new SurveyQuestionDto
+            {
+                Id = 2,
+                Text = "First Name",
+                IsRequired = true,
+                Category = QuestionCategory.Contact
+            },
+            new SurveyQuestionDto
+            {
+                Id = 3,
+                Text = "Last Name",
+                IsRequired = true,
+                Category = QuestionCategory.Contact
+            },
+            new SurveyQuestionDto
+            {
+                Id = 4,
+                Text = "Phone Number",
+                IsRequired = true,
+                Category = QuestionCategory.Contact
+            },
+            new SurveyQuestionDto
+            {
+                Id = 5,
+                Text = "Company",
+                IsRequired = false,
+                Category = QuestionCategory.Contact
+            },
+            new SurveyQuestionDto
+            {
+                Id = 6,
+                Text = "Job Title",
+                IsRequired = false,
+                Category = QuestionCategory.Contact
+            },
+            new SurveyQuestionDto
+            {
+                Id = 7,
+                Text = "Industry",
+                IsRequired = false,
+                Category = QuestionCategory.Contact
+            }
+        };
+
         private readonly ApplicationDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ILLMService _llmService;
@@ -38,6 +96,8 @@ namespace ProcessZero.Infrastructure.Services
 
         /// <summary>
         /// Loads the latest uploaded survey (global, no product filtering).
+        /// Includes prepended base contact questions (indices 0-6) + admin business questions (7+).
+        /// </summary>
         /// </summary>
         private async Task<SurveyDto?> LoadSurveyAsync(CancellationToken cancellationToken = default)
         {
@@ -106,9 +166,31 @@ namespace ProcessZero.Infrastructure.Services
             var survey = await LoadSurveyAsync(cancellationToken)
                 ?? throw new InvalidOperationException("No survey found. Admin must upload a survey first.");
 
-            // Create or get existing respondent
+            // CRITICAL: Extract contact information from first 7 answers
+            // Answers[0-6] are mandatory contact fields
+            if (submission.Answers.Count < 7)
+                throw new InvalidOperationException("Survey submission must include contact information (email, first name, last name, phone, company, job, industry).");
+
+            string email = submission.Answers[0]?.Trim() ?? "";
+            string firstName = submission.Answers[1]?.Trim() ?? "";
+            string lastName = submission.Answers[2]?.Trim() ?? "";
+            string phone = submission.Answers[3]?.Trim() ?? "";
+            string company = submission.Answers[4]?.Trim() ?? "";
+            string job = submission.Answers[5]?.Trim() ?? "";
+            string industry = submission.Answers[6]?.Trim() ?? "";
+
+            if (string.IsNullOrWhiteSpace(email))
+                throw new InvalidOperationException("Email address is required.");
+            if (string.IsNullOrWhiteSpace(firstName))
+                throw new InvalidOperationException("First name is required.");
+            if (string.IsNullOrWhiteSpace(lastName))
+                throw new InvalidOperationException("Last name is required.");
+            if (string.IsNullOrWhiteSpace(phone))
+                throw new InvalidOperationException("Phone number is required.");
+
+            // Create or get existing respondent (unique by email)
             var respondent = await _context.SurveyRespondents
-                .Where(c => c.Email == submission.Respondent.Email)
+                .Where(r => r.Email == email)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (respondent == null)
@@ -116,13 +198,13 @@ namespace ProcessZero.Infrastructure.Services
                 respondent = new SurveyRespondent
                 {
                     UserId = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty,
-                    Email = submission.Respondent.Email,
-                    FirstName = submission.Respondent.FirstName ?? string.Empty,
-                    LastName = submission.Respondent.LastName ?? string.Empty,
-                    Phone = submission.Respondent.Phone ?? string.Empty,
-                    Company = submission.Respondent.Company ?? string.Empty,
-                    Job = submission.Respondent.Job ?? string.Empty,
-                    Industry = submission.Respondent.Industry ?? string.Empty,
+                    Email = email,
+                    FirstName = firstName,
+                    LastName = lastName,
+                    Phone = phone,
+                    Company = company,
+                    Job = job,
+                    Industry = industry,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -130,7 +212,12 @@ namespace ProcessZero.Infrastructure.Services
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            // Create submission record
+            // Extract business answers (indices 7+) to store separately
+            var businessAnswers = submission.Answers.Count > 7
+                ? submission.Answers.GetRange(7, submission.Answers.Count - 7)
+                : new List<string>();
+
+            // Create submission record with ALL answers (including contact)
             var response = new SurveyResponse
             {
                 UserId = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty,
@@ -160,7 +247,7 @@ namespace ProcessZero.Infrastructure.Services
                 // but simply don't add to LeadLake
             }
 
-            // Return result
+            // Return result with business answers only (contact info in separate properties)
             return new SurveyResponseResultDto
             {
                 Id = response.Id,
@@ -171,7 +258,7 @@ namespace ProcessZero.Infrastructure.Services
                 Company = respondent.Company,
                 Job = respondent.Job,
                 Industry = respondent.Industry,
-                Answers = submission.Answers,
+                Answers = businessAnswers,  // Only business question answers (indices 7+)
                 SubmittedAt = response.SubmittedAt
             };
         }
@@ -298,8 +385,33 @@ Do not include any explanation, just the word.";
 
             var userId = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
 
-            // Serialize the survey to JSON
-            var questionsJson = JsonSerializer.Serialize(survey, _jsonOptions);
+            // CRITICAL: Prepend mandatory contact questions to admin's business questions
+            // This ensures EVERY survey captures required contact information for LLM qualification
+            var completeQuestions = new List<SurveyQuestionDto>();
+
+            // Add base contact questions (0-6)
+            completeQuestions.AddRange(BASE_CONTACT_QUESTIONS);
+
+            // Add admin-provided business questions (starting at index 7)
+            // Reassign IDs to maintain uniqueness
+            int questionId = 8;
+            foreach (var question in survey.Questions)
+            {
+                question.Id = questionId++;
+                question.Category = QuestionCategory.Business;
+                completeQuestions.Add(question);
+            }
+
+            // Create updated survey with ALL questions (contact + business)
+            var completeSurvey = new SurveyDto
+            {
+                Title = survey.Title,
+                Description = survey.Description,
+                Questions = completeQuestions
+            };
+
+            // Serialize the complete survey to JSON
+            var questionsJson = JsonSerializer.Serialize(completeSurvey, _jsonOptions);
 
             // Create new survey question entity (global survey)
             var entity = new SurveyQuestion
