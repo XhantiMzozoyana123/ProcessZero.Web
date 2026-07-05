@@ -124,16 +124,18 @@ namespace ProcessZero.Domain
             modelBuilder.Entity<SurveyQuestion>(e =>
             {
                 e.Property(r => r.UserId).HasMaxLength(450);
+                e.Property(r => r.Name).HasMaxLength(255).IsRequired();
                 e.Property(r => r.Title).HasMaxLength(200);
+                e.Property(r => r.Status).HasMaxLength(50).HasDefaultValue("Active");
             });
 
             modelBuilder.Entity<SurveyRespondent>(e =>
             {
                 e.Property(r => r.UserId).HasMaxLength(450);
-                e.Property(r => r.Email).HasMaxLength(256);
-                e.Property(r => r.FirstName).HasMaxLength(100);
-                e.Property(r => r.LastName).HasMaxLength(100);
-                e.Property(r => r.Phone).HasMaxLength(20);
+                e.Property(r => r.Email).HasMaxLength(256).IsRequired();
+                e.Property(r => r.FirstName).HasMaxLength(100).IsRequired();
+                e.Property(r => r.LastName).HasMaxLength(100).IsRequired();
+                e.Property(r => r.Phone).HasMaxLength(20).IsRequired();
                 e.Property(r => r.Company).HasMaxLength(255);
                 e.Property(r => r.Job).HasMaxLength(100);
                 e.Property(r => r.Industry).HasMaxLength(100);
@@ -205,29 +207,54 @@ namespace ProcessZero.Domain
                  .IsDescending(false, false, true);
             });
 
-            // Survey: global market research for product creation
+            // Survey: multiple independent surveys with their own responses and respondents
             modelBuilder.Entity<SurveyQuestion>(e =>
             {
+                e.HasIndex(r => r.Status).HasDatabaseName("IX_SurveyQuestions_Status");
                 e.HasIndex(r => r.UploadedAt)
                  .HasDatabaseName("IX_SurveyQuestions_UploadedAt")
                  .IsDescending(true);
+                e.HasIndex(r => new { r.UserId, r.Status })
+                 .HasDatabaseName("IX_SurveyQuestions_UserId_Status");
             });
 
             modelBuilder.Entity<SurveyRespondent>(e =>
             {
                 e.HasIndex(r => r.UserId).HasDatabaseName("IX_SurveyRespondents_UserId");
-                e.HasIndex(r => r.Email).HasDatabaseName("IX_SurveyRespondents_Email");
+                // Composite unique index: same email can exist in different surveys
+                e.HasIndex(r => new { r.SurveyId, r.Email })
+                 .HasDatabaseName("IX_SurveyRespondents_SurveyId_Email")
+                 .IsUnique();
+                e.HasIndex(r => r.SurveyId).HasDatabaseName("IX_SurveyRespondents_SurveyId");
+
+                // Foreign key to Survey
+                e.HasOne(r => r.Survey)
+                 .WithMany()
+                 .HasForeignKey(r => r.SurveyId)
+                 .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<SurveyResponse>(e =>
             {
+                e.HasIndex(r => r.SurveyId).HasDatabaseName("IX_SurveyResponses_SurveyId");
+                e.HasIndex(r => new { r.SurveyId, r.SubmittedAt })
+                 .HasDatabaseName("IX_SurveyResponses_SurveyId_SubmittedAt")
+                 .IsDescending(false, true);
                 e.HasIndex(r => new { r.SurveyRespondentId, r.SubmittedAt })
                  .HasDatabaseName("IX_SurveyResponses_RespondentId_SubmittedAt")
                  .IsDescending(false, true);
 
+                // Foreign key to Survey
+                e.HasOne(r => r.Survey)
+                 .WithMany(s => s.Responses)
+                 .HasForeignKey(r => r.SurveyId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                // Foreign key to Respondent
                 e.HasOne(r => r.Respondent)
-                 .WithMany()
-                 .HasForeignKey(r => r.SurveyRespondentId);
+                 .WithMany(s => s.Responses)
+                 .HasForeignKey(r => r.SurveyRespondentId)
+                 .OnDelete(DeleteBehavior.Cascade);
             });
 
 

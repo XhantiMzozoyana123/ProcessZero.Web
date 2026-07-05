@@ -38,10 +38,10 @@ namespace ProcessZero.Application.Dtos
 
     /// <summary>
     /// Market research survey definition for gathering pain point insights.
-    /// Single global survey used to validate high-ticket pain point problems.
+    /// Each survey is independent with its own questions, responses, and respondents.
     /// 
     /// IMPORTANT: Contact information questions (email, name, phone, company, job, industry)
-    /// are AUTOMATICALLY prepended to this survey when uploaded.
+    /// are AUTOMATICALLY prepended to this survey when created/updated.
     /// Admin only provides Business/Pain Point questions.
     /// 
     /// Final survey structure:
@@ -56,8 +56,11 @@ namespace ProcessZero.Application.Dtos
     /// </summary>
     public class SurveyDto
     {
+        public int? Id { get; set; }
+        public string Name { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string Status { get; set; } = "Active";
         /// <summary>
         /// Business/pain point questions. Contact questions are automatically prepended by service.
         /// </summary>
@@ -65,7 +68,7 @@ namespace ProcessZero.Application.Dtos
     }
 
     /// <summary>
-    /// Client-facing survey (same as database, includes contact + business questions).
+    /// Client-facing survey (includes contact + business questions).
     /// This is what the frontend receives and should render.
     /// 
     /// Questions array includes:
@@ -76,8 +79,11 @@ namespace ProcessZero.Application.Dtos
     /// </summary>
     public class SurveyClientDto
     {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
         /// <summary>
         /// ALL questions including mandatory contact questions (0-6) and business questions (7+)
         /// </summary>
@@ -85,9 +91,23 @@ namespace ProcessZero.Application.Dtos
     }
 
     /// <summary>
+    /// Survey listing item for admin to see all surveys.
+    /// </summary>
+    public class SurveysListDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public int ResponseCount { get; set; }
+        public DateTime UploadedAt { get; set; }
+    }
+
+    /// <summary>
     /// Survey response submission from a respondent.
     /// 
     /// CRITICAL: Answers array must have one entry per question in Questions array.
+    /// SurveyId specifies which survey is being answered.
     /// 
     /// Contact answers (REQUIRED):
     ///   answers[0]: Email address
@@ -103,6 +123,7 @@ namespace ProcessZero.Application.Dtos
     /// 
     /// Example:
     ///   {
+    ///     "surveyId": 1,
     ///     "answers": [
     ///       "jane@company.com",                    // [0] Email
     ///       "Jane",                                // [1] FirstName
@@ -120,6 +141,11 @@ namespace ProcessZero.Application.Dtos
     public class SurveyResponseSubmissionDto
     {
         /// <summary>
+        /// ID of the survey being answered
+        /// </summary>
+        public int SurveyId { get; set; }
+
+        /// <summary>
         /// Answers array with ONE string per question.
         /// Index 0-6: Contact information responses
         /// Index 7+: Business question responses
@@ -135,6 +161,7 @@ namespace ProcessZero.Application.Dtos
     public class SurveyResponseResultDto
     {
         public int Id { get; set; }
+        public int SurveyId { get; set; }
         public string Email { get; set; } = string.Empty;
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
@@ -152,10 +179,12 @@ namespace ProcessZero.Application.Dtos
 
     /// <summary>
     /// Aggregated survey submission data for admin analysis and AI processing.
-    /// Contains all responses to feed into LLM for creating market-fit products and offers.
+    /// Contains all responses for a specific survey to feed into LLM.
     /// </summary>
     public class SurveySummaryDto
     {
+        public int SurveyId { get; set; }
+        public string Name { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
         public int TotalResponses { get; set; }
         public List<SurveyResponseResultDto> Responses { get; set; } = new List<SurveyResponseResultDto>();
