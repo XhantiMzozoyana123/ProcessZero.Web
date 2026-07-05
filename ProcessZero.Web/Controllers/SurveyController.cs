@@ -227,6 +227,8 @@ namespace ProcessZero.Web.Controllers
         /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpPost]
+        [Route("", Name = "CreateSurveyRoot")]
+        [Route("s", Name = "CreateSurveyPlural")]
         public async Task<IActionResult> CreateSurvey([FromBody] SurveyDto survey, CancellationToken cancellationToken)
         {
             if (survey == null)
