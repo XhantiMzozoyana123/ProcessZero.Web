@@ -31,20 +31,55 @@ namespace ProcessZero.Infrastructure.Services
             _context = context;
         }
 
-        // Register user and assign default claims
+        // Register user with phone number and name information
         public async Task<string> RegisterAsync(RegisterDto model)
         {
-            var user = new ApplicationUser { UserName = model.UserName.Replace(" ", "_"), Email = model.Email };
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(model.UserName))
+                throw new ArgumentException("Username is required");
+            if (string.IsNullOrWhiteSpace(model.Email))
+                throw new ArgumentException("Email is required");
+            if (string.IsNullOrWhiteSpace(model.PhoneNumber))
+                throw new ArgumentException("Phone number is required");
+            if (string.IsNullOrWhiteSpace(model.FirstName))
+                throw new ArgumentException("First name is required");
+            if (string.IsNullOrWhiteSpace(model.LastName))
+                throw new ArgumentException("Last name is required");
+            if (string.IsNullOrWhiteSpace(model.Password))
+                throw new ArgumentException("Password is required");
+
+            // Check if user already exists by email
+            var existingUser = await _userManager.FindByEmailAsync(model.Email);
+            if (existingUser != null)
+                throw new ArgumentException("An account with this email already exists");
+
+            // Create new application user with all information
+            var user = new ApplicationUser
+            {
+                UserName = model.UserName.Replace(" ", "_"),
+                Email = model.Email,
+                PhoneNumber = model.PhoneNumber,
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                EmailConfirmed = false,
+                PhoneNumberConfirmed = false
+            };
+
+            // Create user with password
             var result = await _userManager.CreateAsync(user, model.Password);
 
             if (result.Succeeded)
             {
+                // Enable two-factor authentication by default
                 await _userManager.SetTwoFactorEnabledAsync(user, true);
-                return "User registered successfully";
+
+                // Return success message
+                return $"User {model.FirstName} {model.LastName} registered successfully. Please verify your email and phone number.";
             }
 
+            // Collect and throw all errors
             var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-            throw new Exception(errors);
+            throw new Exception($"Registration failed: {errors}");
         }
 
         // Updated LoginAsync method to use async JWT with account lockout support

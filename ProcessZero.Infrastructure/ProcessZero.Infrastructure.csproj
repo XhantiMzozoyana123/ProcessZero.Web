@@ -12,6 +12,7 @@
     <PackageReference Include="Google.Apis.Gmail.v1" Version="1.69.0.3742" />
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+    <PackageReference Include="Twilio" Version="7.14.9" />
     <PackageReference Include="YoutubeExplode" Version="6.6.0" />
   </ItemGroup>
 

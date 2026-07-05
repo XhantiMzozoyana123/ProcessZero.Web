@@ -469,5 +469,11 @@ namespace ProcessZero.Domain
         public DbSet<RelayCampaignLead> RelayCampaignLeads { get; set; }
         public DbSet<RelayLead> RelayLeads { get; set; }
         public DbSet<RelayEmailActivity> RelayEmailActivities { get; set; }
+
+        // SCHEDULER SYSTEM
+        public DbSet<ScheduledSmsMessage> ScheduledSmsMessages { get; set; }
+        public DbSet<ScheduledWhatsAppMessage> ScheduledWhatsAppMessages { get; set; }
+        public DbSet<ScheduledFacebookMessage> ScheduledFacebookMessages { get; set; }
+        public DbSet<ScheduledEmailMessage> ScheduledEmailMessages { get; set; }
     }
 }

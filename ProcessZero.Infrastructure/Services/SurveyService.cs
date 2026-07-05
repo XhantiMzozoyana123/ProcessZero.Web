@@ -593,19 +593,19 @@ namespace ProcessZero.Infrastructure.Services
             CancellationToken cancellationToken)
         {
             var analysisPrompt = $@"
-Analyze the following survey responses to determine if this person has real, actionable pain points that indicate high-ticket business problems:
+                Analyze the following survey responses to determine if this person has real, actionable pain points that indicate high-ticket business problems:
 
-Survey Title: {survey.Title}
-Survey Description: {survey.Description}
+                Survey Title: {survey.Title}
+                Survey Description: {survey.Description}
 
-Respondent Details:
-- Name: {respondent.FirstName} {respondent.LastName}
-- Company: {respondent.Company}
-- Job: {respondent.Job}
-- Industry: {respondent.Industry}
+                Respondent Details:
+                - Name: {respondent.FirstName} {respondent.LastName}
+                - Company: {respondent.Company}
+                - Job: {respondent.Job}
+                - Industry: {respondent.Industry}
 
-Survey Responses:
-";
+                Survey Responses:
+                ";
 
             for (int i = 0; i < survey.Questions.Count && i < submission.Answers.Count; i++)
             {
@@ -613,13 +613,13 @@ Survey Responses:
             }
 
             analysisPrompt += @"
-Based on the survey responses, determine if this person represents a real, high-ticket pain point that could lead to a B2B product sale.
+                Based on the survey responses, determine if this person represents a real, high-ticket pain point that could lead to a B2B product sale.
 
-Respond with ONLY one word:
-- 'QUALIFY' if they show clear pain points and business problems worth pursuing
-- 'REJECT' if the responses are superficial, generic, or don't indicate real problems
+                Respond with ONLY one word:
+                - 'QUALIFY' if they show clear pain points and business problems worth pursuing
+                - 'REJECT' if the responses are superficial, generic, or don't indicate real problems
 
-Do not include any explanation, just the word.";
+                Do not include any explanation, just the word.";
 
             try
             {

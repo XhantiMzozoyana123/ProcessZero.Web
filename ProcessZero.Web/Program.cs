@@ -7,6 +7,7 @@ using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using ProcessZero.Application.Options;
 using ProcessZero.Domain;
+using ProcessZero.Infrastructure.BackgroundJobs;
 using ProcessZero.Infrastructure.Filters;
 using ProcessZero.Infrastructure.Services;
 using System.Security.Claims;
@@ -162,7 +163,10 @@ builder.Services.AddScoped<IBankAccountService, BankAccountService>();
 builder.Services.AddScoped<IContactService, ContactService>();
 builder.Services.AddScoped<ILeadLakeService, LeadLakeService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IEmailBlasterService, EmailBlasterService>();
+builder.Services.AddScoped<ITwilioService, TwilioService>();
+builder.Services.AddScoped<ISchedulerService, SchedulerService>();
+builder.Services.AddScoped<IBlasterService, BlasterService>();
+builder.Services.AddScoped<ScheduledMessagesBackgroundJob>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
@@ -251,6 +255,14 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
     Authorization = new[] { new HangfireAuthorizationFilter() }
 });
+
+// -----------------------------
+// HANGFIRE RECURRING JOBS
+// -----------------------------
+RecurringJob.AddOrUpdate<ScheduledMessagesBackgroundJob>(
+    "process-scheduled-messages",
+    job => job.ProcessScheduledMessagesAsync(),
+    Cron.MinuteInterval(1)); // Run every minute
 
 // -----------------------------
 // KUBERNETES ROUND-ROBIN TEST
