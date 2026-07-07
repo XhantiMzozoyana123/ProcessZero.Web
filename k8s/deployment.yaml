@@ -20,13 +20,16 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+          # Load all environment variables from ConfigMap (non-sensitive config)
+          envFrom:
+            - configMapRef:
+                name: processzero-config
+            - secretRef:
+                name: processzero-secrets
           env:
-            - name: ASPNETCORE_ENVIRONMENT
-              value: "Production"
-            - name: ASPNETCORE_URLS
-              value: "http://+:8080"
-            - name: DOTNET_RUNNING_IN_CONTAINER
-              value: "true"
+            # Override with specific values if needed
+            - name: ENVIRONMENT_TYPE
+              value: "kubernetes"
           # Adjust resources based on your cluster capacity
           resources:
             requests:

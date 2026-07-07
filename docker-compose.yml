@@ -8,12 +8,22 @@ services:
     ports:
       - "8080:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      # Override config via environment variables (use __ for nested keys).
-      # By default the app uses the connection string baked into appsettings.json.
-      # Uncomment the line below to point at the bundled "db" service instead:
-      # ConnectionStrings__DefaultConnection: "Server=db;Port=3306;Database=processzero;User=processzero;Password=processzero;AllowUserVariables=true;UseAffectedRows=false"
+      ENVIRONMENT_TYPE: docker-compose
+      # ⚠️ FOR LOCAL DEVELOPMENT ONLY - USE KUBERNETES SECRETS IN PRODUCTION
+      # These are placeholder values. For real development, use dotnet user-secrets
+      Twilio__AccountSid: "AC_YOUR_DEVELOPMENT_ACCOUNT_SID"
+      Twilio__AuthToken: "your_development_auth_token"
+      Twilio__PhoneNumber: "+1234567890"
+      CalOptions__ApiKey: "cal_test_api_key_for_development"
+      Paystack__SecretKey: "sk_test_development_key"
+      PayFast__MerchantId: "development_merchant_id"
+      PayFast__MerchantKey: "development_merchant_key"
+      PayFast__Passphrase: "development_passphrase"
+      GoogleOAuth__ClientId: "development_client_id"
+      GoogleOAuth__ClientSecret: "development_client_secret"
+      Jwt__Key: "development_jwt_key_min_32_characters_long"
     restart: unless-stopped
     # Uncomment to use the local MySQL service below:
     # depends_on:
@@ -24,8 +34,7 @@ services:
   # Optional local MySQL database. The app currently points at a remote DB in
   # appsettings.json, so this is disabled by default. To use it:
   #   1. Uncomment this whole "db" block.
-  #   2. Uncomment the ConnectionStrings__DefaultConnection env var above.
-  #   3. Uncomment the depends_on block above.
+  #   2. Uncomment the depends_on block above.
   # ---------------------------------------------------------------------------
   # db:
   #   image: mysql:8.0
