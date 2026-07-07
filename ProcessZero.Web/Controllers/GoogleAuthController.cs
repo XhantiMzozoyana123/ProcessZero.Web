@@ -102,20 +102,20 @@ namespace ProcessZero.Web.Controllers
             if (string.IsNullOrWhiteSpace(code))
             {
                 var error = Uri.EscapeDataString("Missing authorization code from Google");
-                return Redirect($"http://localhost:8100/auth-callback?error={error}");
+                return Redirect($"https://processzero.xyz/auth-callback?error={error}");
             }
 
             if (string.IsNullOrWhiteSpace(state))
             {
                 var error = Uri.EscapeDataString("Missing state token");
-                return Redirect($"http://localhost:8100/auth-callback?error={error}");
+                return Redirect($"https://processzero.xyz/auth-callback?error={error}");
             }
 
             try
             {
                 // Redirect to frontend with code and state
                 // Frontend will read these from URL and call POST /callback-exchange
-                var callbackUrl = $"http://localhost:8100/auth-callback?" +
+                var callbackUrl = $"https://processzero.xyz/auth-callback?" +
                     $"code={Uri.EscapeDataString(code)}&" +
                     $"state={Uri.EscapeDataString(state)}";
 
@@ -124,7 +124,7 @@ namespace ProcessZero.Web.Controllers
             catch (Exception ex)
             {
                 var error = Uri.EscapeDataString(ex.Message);
-                return Redirect($"http://localhost:8100/auth-callback?error={error}");
+                return Redirect($"https://processzero.xyz/auth-callback?error={error}");
             }
         }
 
