@@ -227,7 +227,7 @@ kubectl -n processzero logs -f deployment/processzero-web
 kubectl -n processzero scale deployment processzero-web --replicas=5
 
 # Port forward for testing
-kubectl -n processzero port-forward svc/processzero-web 8080:8080
+kubectl -n processzero port-forward svc/processzero-web 8081:8081
 
 # Check if Kubernetes
 kubectl -n processzero exec -it <pod> -- env | grep KUBERNETES_SERVICE_HOST

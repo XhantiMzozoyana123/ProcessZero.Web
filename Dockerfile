@@ -31,8 +31,8 @@ RUN dotnet publish ProcessZero.Web/ProcessZero.Web.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
-# ASP.NET Core listens on port 8080 by default in the .NET 8 runtime image
-ENV ASPNETCORE_URLS=http://+:8080 \
+# ASP.NET Core listens on port 8081 in the .NET 8 runtime image
+ENV ASPNETCORE_URLS=http://+:8081 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -51,6 +51,6 @@ RUN if [ -f ./.playwright/package/cli.js ]; then \
         echo "Playwright CLI not found in publish output - skipping browser install"; \
     fi
 
-EXPOSE 8080
+EXPOSE 8081
 
 ENTRYPOINT ["dotnet", "ProcessZero.Web.dll"]

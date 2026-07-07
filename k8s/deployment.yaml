@@ -19,7 +19,7 @@ spec:
           image: processzero-web:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - containerPort: 8081
           # Load all environment variables from ConfigMap (non-sensitive config)
           envFrom:
             - configMapRef:

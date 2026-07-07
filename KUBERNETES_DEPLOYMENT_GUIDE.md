@@ -292,8 +292,8 @@ kubectl -n processzero get pods -o wide
 kubectl -n processzero exec -it <pod-name> -- /bin/bash
 
 # Port forward (access app locally)
-kubectl -n processzero port-forward svc/processzero-web 8080:8080
-# Then visit: http://localhost:8080
+kubectl -n processzero port-forward svc/processzero-web 8081:8081
+# Then visit: http://localhost:8081
 
 # Stream logs
 kubectl -n processzero logs -f deployment/processzero-web

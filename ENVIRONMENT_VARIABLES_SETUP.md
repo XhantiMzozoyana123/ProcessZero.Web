@@ -133,7 +133,7 @@ docker compose exec web env | grep Twilio
 
 ```bash
 # Send a test SMS
-curl -X POST http://localhost:8080/api/twilio/send-sms \
+curl -X POST http://localhost:8081/api/twilio/send-sms \
   -H "Content-Type: application/json" \
   -d '{"phoneNumber":"+1234567890","message":"Test"}'
 ```

@@ -209,7 +209,7 @@ ProcessZero.Web/
 │
 └── k8s/
 	├── deployment.yaml                          (10 replicas, health checks)
-	├── service.yaml                             (ClusterIP:8080)
+	├── service.yaml                             (ClusterIP:8081)
 	├── secrets.yaml                             ⚠️ NOT committed (has real creds)
 	├── generate-k8s-secrets.ps1                 (encode secrets to base64)
 	├── deploy-to-vps.ps1                        (deploy from Windows)

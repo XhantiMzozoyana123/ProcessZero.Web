@@ -91,7 +91,7 @@ docker compose exec web env | grep Twilio
 
 ### Check app is running
 ```bash
-curl http://localhost:8080
+curl http://localhost:8081
 ```
 
 ---
@@ -130,7 +130,7 @@ docker compose exec web env | grep Twilio
 
 ### Method 3: Test Twilio SMS endpoint
 ```bash
-curl -X POST http://localhost:8080/api/twilio/send-sms \
+curl -X POST http://localhost:8081/api/twilio/send-sms \
   -H "Content-Type: application/json" \
   -d '{"phoneNumber":"+1234567890","message":"Test"}'
 ```

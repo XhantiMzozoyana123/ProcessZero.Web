@@ -133,7 +133,7 @@ processzero namespace
 │   ├── GoogleOAuth__ClientId
 │   └── ... (all your API keys)
 ├── Service: processzero-web (LoadBalancer/ClusterIP)
-│   └── Port 8080
+│   └── Port 8081
 └── Deployment: processzero-web
 	└── 10 replicas (configurable)
 		└── Each pod gets all secrets via envFrom
@@ -155,7 +155,7 @@ kubectl -n processzero logs -f deployment/processzero-web
 kubectl -n processzero scale deployment processzero-web --replicas=5
 
 # Port forward to test locally
-kubectl -n processzero port-forward svc/processzero-web 8080:8080
+kubectl -n processzero port-forward svc/processzero-web 8081:8081
 
 # Execute command in pod
 kubectl -n processzero exec -it <pod-name> -- bash
