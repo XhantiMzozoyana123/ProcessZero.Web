@@ -7,9 +7,11 @@ namespace ProcessZero.Domain.Entities
     /// <summary>
     /// Daily performance snapshot for a sales rep on a given product.
     /// Tracks the complete sales pipeline: outreach → replies → meetings → deals.
+    /// Used for KPI tracking and enforcement.
     /// </summary>
     public class KPI : BaseEntity
     {
+        /// <summary>The product these metrics apply to.</summary>
         [Required]
         public int ProductId { get; set; }
 
@@ -41,7 +43,7 @@ namespace ProcessZero.Domain.Entities
         /// <summary>Number of active clients used for MRR calculation.</summary>
         public int ActiveClients { get; set; } = 0;
 
-        /// <summary>Monthly Recurring Revenue from active clients.</summary>
+        /// <summary>Monthly Recurring Revenue from active clients for the day.</summary>
         public decimal MonthlyRecurringRevenue { get; set; } = 0;
     }
 }

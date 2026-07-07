@@ -211,6 +211,7 @@ builder.Services.AddScoped<ISurveyService, SurveyService>();
 builder.Services.AddScoped<IInboxService, InboxService>();
 builder.Services.AddScoped<IGoogleOAuthService, GoogleOAuthService>();
 builder.Services.AddScoped<IGmailService, GmailService>();
+builder.Services.AddScoped<IDataLakeService, DataLakeService>();
 
 // -----------------------------
 // RELAY ENGINE
