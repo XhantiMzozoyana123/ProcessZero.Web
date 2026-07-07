@@ -31,20 +31,32 @@ Stop with `Ctrl+C`, then `docker compose down`.
 
 ## Configuration / secrets
 
-The app currently reads its MySQL connection string and other secrets from
-`ProcessZero.Web/appsettings.json`. You can override any setting at runtime with
-environment variables (use `__` for nested keys). For example:
+The app reads non-sensitive defaults from `ProcessZero.Web/appsettings.json`, but
+**secrets are externalized to environment variables** (and never committed to Git).
+
+ASP.NET Core automatically overrides `appsettings.json` values with environment
+variables using the `__` separator. For example:
 
 ```bash
 docker run --rm -p 8080:8080 \
   -e "ConnectionStrings__DefaultConnection=Server=my-db;Port=3306;Database=processzero;User=user;Password=pass;AllowUserVariables=true;UseAffectedRows=false" \
   -e "Jwt__Key=your-secret-key" \
+  -e "Twilio__AccountSid=ACxxxxxx" \
+  -e "Twilio__AuthToken=your-auth-token" \
   processzero-web:latest
 ```
 
-> Security note: secrets are currently committed in `appsettings.json`. For a
-> production deployment, prefer passing them as environment variables (as above)
-> or via a secrets manager rather than baking them into the image.
+For local development or temporary testing, you can also use a `.env` file in the
+project root:
+
+```bash
+# .env (DO NOT commit to Git)
+ConnectionStrings__DefaultConnection=Server=my-db;Database=processzero;User=user;Password=pass;
+Jwt__Key=your-secret-key
+
+# Run with Docker Compose (reads .env automatically)
+docker compose up --build
+```
 
 ## Optional local MySQL
 

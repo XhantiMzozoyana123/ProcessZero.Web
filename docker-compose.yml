@@ -7,34 +7,15 @@ services:
     container_name: processzero-web
     ports:
       - "8081:8081"
+    env_file:
+      - ./.processzero.env
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8081
-
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      # TWILIO CREDENTIALS (Set on your Linux VPS)
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      # For local development, use dotnet user-secrets or set below:
-      # For production, set these environment variables on the server:
-      #   export Twilio__AccountSid="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-      #   export Twilio__AuthToken="your_auth_token_here"
-      #   export Twilio__PhoneNumber="+1234567890"
-
-      Twilio__AccountSid: "${TWILIO_ACCOUNT_SID:-your_account_sid_here}"
-      Twilio__AuthToken: "${TWILIO_AUTH_TOKEN:-your_auth_token_here}"
-      Twilio__PhoneNumber: "${TWILIO_PHONE_NUMBER:-+1234567890}"
-
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      # OTHER API CREDENTIALS (Same pattern - set as env vars)
-      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      CalOptions__ApiKey: "${CAL_API_KEY:-your_cal_api_key}"
-      Paystack__SecretKey: "${PAYSTACK_SECRET_KEY:-your_paystack_key}"
-      PayFast__MerchantId: "${PAYFAST_MERCHANT_ID:-your_merchant_id}"
-      PayFast__MerchantKey: "${PAYFAST_MERCHANT_KEY:-your_merchant_key}"
-      PayFast__Passphrase: "${PAYFAST_PASSPHRASE:-your_passphrase}"
-      GoogleOAuth__ClientId: "${GOOGLE_CLIENT_ID:-your_client_id}"
-      GoogleOAuth__ClientSecret: "${GOOGLE_CLIENT_SECRET:-your_client_secret}"
-      Jwt__Key: "${JWT_KEY:-your_jwt_key_min_32_characters}"
+      # All app settings for the VPS are loaded from:
+      #   ./.processzero.env
+      # Create/update that file by running:
+      #   sudo bash setup-env-vars.sh
 
     restart: unless-stopped
     # Uncomment to use the local MySQL service below:

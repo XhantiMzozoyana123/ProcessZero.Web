@@ -1,4 +1,4 @@
-# Environment Variables - Simple Production Setup
+# Environment Variables - Production Setup
 
 ## 🚀 Quick Start (3 Steps)
 
@@ -8,11 +8,14 @@
 # SSH into your Linux VPS
 ssh user@your-vps-ip
 
+# Navigate to your project directory
+cd /path/to/ProcessZero.Web
+
 # Run the setup script (one-time)
-sudo bash ~/setup-env-vars.sh
+sudo bash setup-env-vars.sh
 
 # This will prompt for your credentials and save them to:
-# /etc/environment.d/processzero.conf
+# ./.processzero.env (in your project directory)
 ```
 
 ### Step 2: Update & Deploy Code
@@ -23,6 +26,8 @@ git pull origin master
 docker compose down
 docker compose up -d --build
 ```
+
+**Important:** `.processzero.env` is already in `.gitignore` and will NOT be overwritten by `git pull`.
 
 ### Step 3: Verify It's Working
 
@@ -63,12 +68,21 @@ echo 'export Twilio__AuthToken="your_auth_token"' >> ~/.bashrc
 echo 'export Twilio__PhoneNumber="+1234567890"' >> ~/.bashrc
 source ~/.bashrc
 
-# Method 2: Systemd environment file (persistent system-wide)
-sudo tee /etc/environment.d/processzero.conf > /dev/null << EOF
-Twilio__AccountSid="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Method 2: Docker Compose .env file (recommended for Docker deployments)
+# The setup-env-vars.sh script creates .processzero.env automatically
+# You can also create it manually:
+cat > .processzero.env << EOF
+ConnectionStrings__DefaultConnection=Server=localhost;Database=processzero;User=root;Password=password;
+Jwt__Key=your-super-secret-jwt-key-minimum-32-characters-long
+Jwt__Issuer=https://api.processzero.xyz
+Jwt__Audience=https://processzero.xyz
+Twilio__AccountSid=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 Twilio__AuthToken="your_auth_token"
-Twilio__PhoneNumber="+1234567890"
+Twilio__PhoneNumber=+1234567890
 EOF
+
+# Secure the file (contains secrets)
+chmod 600 .processzero.env
 
 # Method 3: Docker environment file (.env)
 cat > .env << EOF
@@ -164,11 +178,11 @@ curl -X POST http://localhost:8081/api/twilio/send-sms \
 |--------|-------|-------------|---------|----------|
 | Export in shell | ❌ No | ❌ No | ⚠️ Medium | Testing |
 | .bashrc | ✅ Yes | ✅ Yes | ⚠️ Medium | Single user |
-| /etc/environment.d | ✅ Yes | ✅ Yes | ✅ Good | System-wide |
-| .env file | ✅ Yes | ✅ Yes (with Compose) | ⚠️ Medium | Docker Compose |
+| .processzero.env | ✅ Yes | ✅ Yes | ✅ Good | Docker Compose |
+| systemd Environment | ✅ Yes | ✅ Yes | ✅ Good | Systemd services |
 | Kubernetes Secrets | ⚠️ Moderate | ✅ Yes | ✅ Good | Kubernetes |
 
-**Recommendation for your setup:** Use `/etc/environment.d/` with the `setup-env-vars.sh` script (one-time setup, persistent)
+**Recommendation for your setup:** Use `.processzero.env` with Docker Compose (managed by `setup-env-vars.sh`)
 
 ---
 
@@ -177,29 +191,26 @@ curl -X POST http://localhost:8081/api/twilio/send-sms \
 ### Credentials Not Loading
 ```bash
 # Check if environment file exists
-ls -la /etc/environment.d/processzero.conf
+ls -la .processzero.env
 
 # Verify content
-cat /etc/environment.d/processzero.conf | grep Twilio
+cat .processzero.env | grep Twilio
 
-# Source it manually
-source /etc/environment.d/processzero.conf
-
-# Verify it was loaded
-echo $Twilio__AccountSid
+# Verify Docker Compose is using it
+docker compose config | grep -A 5 env_file
 ```
 
 ### Docker Can't See Environment Variables
 ```bash
-# Restart Docker daemon
-sudo systemctl restart docker
+# Verify .processzero.env syntax (no quotes around values)
+cat .processzero.env
 
-# Or reload environment
-sudo systemctl daemon-reload
-
-# Then redeploy
+# Restart containers
 docker compose down
 docker compose up -d --build
+
+# Check if variables loaded
+docker compose exec web env | grep -i twilio
 ```
 
 ### Twilio Integration Still Failing
@@ -248,27 +259,30 @@ env | grep Twilio
 Run this **once** on your Linux VPS:
 
 ```bash
-# 1. Create setup script
-cat > ~/setup-env-vars.sh << 'EOF'
-#!/bin/bash
-# ... (script content from setup-env-vars.sh)
-EOF
+# 1. SSH into your VPS
+ssh user@your-vps-ip
 
-# 2. Make executable
-chmod +x ~/setup-env-vars.sh
+# 2. Navigate to your project
+cd /home/xhanti/ProcessZero.Web
 
-# 3. Run it
-sudo ~/setup-env-vars.sh
+# 3. Run the setup script
+sudo bash setup-env-vars.sh
 
-# 4. Verify
-source /etc/environment.d/processzero.conf
-echo $Twilio__AccountSid
+# 4. Verify the file was created
+cat .processzero.env | head -5
+
+# 5. Deploy
+docker compose down
+docker compose up -d --build
+
+# 6. Verify in logs
+docker compose logs -f | grep -i "twilio\|starting"
 ```
 
 Then every time you deploy:
 
 ```bash
-cd /path/to/ProcessZero.Web
+cd /home/xhanti/ProcessZero.Web
 git pull origin master
 docker compose down && docker compose up -d --build
 ```
