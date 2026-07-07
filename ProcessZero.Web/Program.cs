@@ -24,37 +24,10 @@ Console.WriteLine($"   - Kubernetes Service Host: {Environment.GetEnvironmentVar
 Console.WriteLine($"   - Environment Type: {environmentType}");
 Console.WriteLine($"   - Is Kubernetes: {isKubernetes}");
 
-// Load Azure Key Vault secrets in production (only if NOT in Kubernetes)
-if (builder.Environment.IsProduction() && !isKubernetes)
-{
-    var keyVaultUrl = builder.Configuration["KeyVault:Url"];
-    if (!string.IsNullOrEmpty(keyVaultUrl))
-    {
-        try
-        {
-            builder.Configuration.AddAzureKeyVault(
-                new Uri(keyVaultUrl),
-                new Azure.Identity.DefaultAzureCredential());
-            Console.WriteLine($"✅ Loaded secrets from Azure Key Vault: {keyVaultUrl}");
-        }
-        catch (Exception ex)
-        {
-            // Log but don't fail - environment variables can still be used
-            Console.WriteLine($"⚠️  Warning: Could not load Azure Key Vault: {ex.Message}");
-        }
-    }
-}
-
 // In Kubernetes, secrets are injected as environment variables via secrets.yaml
 if (isKubernetes)
 {
     Console.WriteLine("✅ Running in Kubernetes - secrets loaded from ConfigMap & Secrets");
-}
-
-// Add application insights if in Kubernetes
-if (isKubernetes)
-{
-    builder.Services.AddApplicationInsightsTelemetry();
 }
 
 // Helper function to detect Kubernetes
