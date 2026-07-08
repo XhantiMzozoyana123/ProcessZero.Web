@@ -64,9 +64,65 @@ namespace ProcessZero.Web.Controllers
     ///   - SubmittedAt: Response timestamp
     /// 
     /// LeadLakes:
-    ///   - Auto-populated by LLM qualification
-    ///   - Email-based deduplication (global across surveys)
-    /// </summary>
+///   - Auto-populated by LLM qualification
+///   - Email-based deduplication (global across surveys)
+///
+/// ╔══════════════════════════════════════════════════════════════════════════════╗
+/// ║              ERROR 400 (BAD REQUEST) — FRONTEND TROUBLESHOOTING              ║
+/// ╚══════════════════════════════════════════════════════════════════════════════╝
+///
+/// This controller is decorated with [ApiController] (see class declaration below).
+/// That attribute turns on ASP.NET Core's AUTOMATIC model-state validation, which
+/// means a 400 is returned by the framework ITSELF — BEFORE your action method ever
+/// executes — whenever the incoming request cannot be bound to the expected model.
+/// The most common reasons the UI sees a 400 from this controller are:
+///
+///   1. MISSING HEADER: The POST request does not include
+///      "Content-Type: application/json". The model binder refuses to read the
+///      body and immediately returns 400 without calling the action.
+///        ➜ FIX: Always send  fetch(url, { headers: { 'Content-Type': 'application/json' }, ... })
+///
+///   2. MALFORMED / INVALID JSON: The body is not valid JSON, or values do not
+///      match the expected C# types. Examples that trigger 400 automatically:
+///        - surveyId sent as a non-numeric string ("abc") for an [HttpPost] body
+///          where SurveyResponseSubmissionDto.SurveyId is `int`.
+///        - answers is not an array of strings, or is missing entirely.
+///        - Extra/unknown properties are fine (ignored), but a broken JSON structure
+///          (e.g. trailing comma, unquoted key) is NOT.
+///        ➜ FIX: Validate the JSON.stringify() payload in the browser devtools
+///              Network tab before sending.
+///
+///   3. EMPTY / NULL BODY ON CREATE OR UPDATE:
+///      In CreateSurvey and UpdateSurvey we explicitly guard:
+///          if (survey == null) return BadRequest("Survey payload is required.");
+///      If the JSON body fails to deserialize into SurveyDto (e.g. wrong shape),
+///      `survey` arrives null and the action returns 400 by design.
+///
+///   4. ROUTE / TYPE MISMATCH ON GET/PUT/DELETE:
+///      Endpoints like GET /api/survey/{id:int} require an integer segment.
+///      If the UI calls /api/survey/abc the routing constraint fails and the
+///      framework returns 400 (or 404 if no matching route) before the action runs.
+///
+/// ⚠  IMPORTANT STATUS-CODE INCONSISTENCY WORTH KNOWING (documented for the UI team):
+///    - SubmitResponse maps ArgumentException      -> 400 BadRequest
+///                            InvalidOperationException -> 404 NotFound
+///      BUT the service throws InvalidOperationException for "answers < 7" and for
+///      missing required contact fields (email/firstName/lastName/phone). So those
+///      VALIDATION failures actually come back as 404, NOT 400. The UI should treat
+///      both 400 and 404 from /api/survey/submit as "the submission was rejected".
+///    - CreateSurvey/UpdateSurvey instead map InvalidOperationException -> 400,
+///      so the same exception type yields a different code depending on the endpoint.
+///      This is a known inconsistency; until it is unified, the frontend must handle
+///      both 400 and 404 as failure for these endpoints.
+///
+/// SUMMARY FOR FRONTEND DEVELOPERS:
+///   * A 400 from this controller is almost always a request-FORMAT problem
+///     (missing Content-Type, bad JSON, wrong types, null body) — NOT a business
+///     logic rejection. Inspect the Network tab request headers & body first.
+///   * A 404 with a message like "Survey not found", "not active", "Email required",
+///     or "must include contact information" means the server received the request
+///     but rejected the DATA. Show that message to the user.
+/// </summary>
     [ApiController]
     [Route("api/survey")]
     public class SurveyController : ControllerBase
@@ -151,10 +207,53 @@ namespace ProcessZero.Web.Controllers
         /// Error Cases:
         ///   400 Bad Request: Invalid request body, insufficient answers
         ///   404 Not Found: Survey not found, contact fields missing/invalid
+        ///
+        /// ────────────────────────────────────────────────────────────────────────
+        /// WHY THE FRONTEND GETS A 400 / 404 FROM THIS ENDPOINT (read this first):
+        /// ────────────────────────────────────────────────────────────────────────
+        /// Because the controller is [ApiController], the framework validates the
+        /// [FromBody] SurveyResponseSubmissionDto BEFORE this method runs:
+        ///
+        ///   • 400 (framework, before method body):
+        ///       - Missing "Content-Type: application/json" header  → binder rejects body.
+        ///       - Body is not valid JSON, or `surveyId` is not an int, or `answers`
+        ///         is not a JSON array of strings. The model simply cannot bind.
+        ///       The catch blocks below are NEVER reached in these cases.
+        ///
+        ///   • 400 (our code, ArgumentException branch):
+        ///       - Currently the service does NOT throw ArgumentException from this
+        ///         path, so a 400 from OUR code is rare here. If it ever does, the
+        ///         message is returned verbatim to the UI.
+        ///
+        ///   • 404 (our code, InvalidOperationException branch) — THE COMMON CASE:
+        ///       The service throws InvalidOperationException for ALL of the following,
+        ///       and they are mapped to 404 (NOT 400) here:
+        ///         - Survey not found / survey id does not exist.
+        ///         - Survey exists but Status != "Active".
+        ///         - answers.Count < 7  → "must include contact information...".
+        ///         - answers[0] (email) empty/whitespace  → "Email address is required."
+        ///         - answers[1] (firstName) empty → "First name is required."
+        ///         - answers[2] (lastName) empty  → "Last name is required."
+        ///         - answers[3] (phone) empty     → "Phone number is required."
+        ///       ⚠ The docstring above says these are "400" but they actually return
+        ///         404. This is a KNOWN INCONSISTENCY — the UI must treat BOTH 400
+        ///         and 404 from /api/survey/submit as a rejected submission and
+        ///         display ex.Message to the user.
+        ///
+        /// QUICK FRONTEND CHECKLIST WHEN YOU SEE A 400 ON SUBMIT:
+        ///   1. DevTools → Network → look at the request. Is "Content-Type:
+        ///      application/json" present? If not, add it.
+        ///   2. Is the body valid JSON.parse()-able? Open it in the console.
+        ///   3. Is `surveyId` a real number (not a string, not null)?
+        ///   4. Does `answers` have at least 7 entries, with indices 0-3 non-empty?
         /// </summary>
         [HttpPost("submit")]
         public async Task<IActionResult> SubmitResponse([FromBody] SurveyResponseSubmissionDto submission, CancellationToken cancellationToken)
         {
+            // NOTE: If `submission` fails to bind (bad JSON / wrong types / no
+            // Content-Type header), ASP.NET Core returns 400 automatically and this
+            // method is never entered. The try/catch below only handles exceptions
+            // thrown by the service after a SUCCESSFUL model bind.
             try
             {
                 var result = await _surveyService.SubmitResponseAsync(submission, cancellationToken);
@@ -162,10 +261,13 @@ namespace ProcessZero.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
+                // Business/data rejections (survey missing, not active, missing
+                // contact info). Returned as 404 per current mapping — see note above.
                 return NotFound(ex.Message);
             }
             catch (ArgumentException ex)
             {
+                // Rare for this endpoint; genuine bad-argument from the service.
                 return BadRequest(ex.Message);
             }
         }
@@ -231,6 +333,9 @@ namespace ProcessZero.Web.Controllers
         [Route("s", Name = "CreateSurveyPlural")]
         public async Task<IActionResult> CreateSurvey([FromBody] SurveyDto survey, CancellationToken cancellationToken)
         {
+            // 400 SOURCE #1 (explicit): If the JSON body could not be deserialized
+            // into SurveyDto (wrong shape, or missing Content-Type: application/json
+            // so the binder read nothing), `survey` is null and we return 400 here.
             if (survey == null)
                 return BadRequest("Survey payload is required.");
 
@@ -241,6 +346,11 @@ namespace ProcessZero.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
+                // 400 SOURCE #2 (service): "Survey name is required." when Name is
+                // blank. NOTE: this endpoint maps InvalidOperationException -> 400,
+                // whereas SubmitResponse maps the SAME exception type -> 404. This is
+                // the documented inconsistency; the UI must handle both codes as a
+                // creation failure and surface ex.Message.
                 return BadRequest(ex.Message);
             }
         }
@@ -275,6 +385,9 @@ namespace ProcessZero.Web.Controllers
         [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdateSurvey(int id, [FromBody] SurveyDto survey, CancellationToken cancellationToken)
         {
+            // 400 SOURCE #1 (explicit): Same null-body guard as CreateSurvey. A 400
+            // here means the request body did not bind to SurveyDto — usually a
+            // missing "Content-Type: application/json" header or malformed JSON.
             if (survey == null)
                 return BadRequest("Survey payload is required.");
 
@@ -288,6 +401,10 @@ namespace ProcessZero.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
+                // NOTE: UpdateSurvey maps InvalidOperationException -> 404 (unlike
+                // CreateSurvey which maps it -> 400). So "Survey ID is required" and
+                // "Survey {id} not found" come back as 404 here. The UI should treat
+                // 400 and 404 from PUT /api/survey/{id} both as a failed update.
                 return NotFound(ex.Message);
             }
         }
