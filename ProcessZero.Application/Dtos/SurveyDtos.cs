@@ -16,6 +16,40 @@ namespace ProcessZero.Application.Dtos
     }
 
     /// <summary>
+    /// Type of question — mirrors the assessment question model (MCQ + OpenEnded).
+    ///
+    /// This brings the survey question structure in line with how assessments work:
+    ///   - MultipleChoice: a closed question with a fixed set of `Options` the
+    ///                     respondent picks from. Equivalent to assessment QuestionDto
+    ///                     (but surveys are NOT scored, so there is no CorrectIndex).
+    ///   - OpenEnded:      a free-text question the respondent answers in their own
+    ///                     words. Equivalent to assessment OpenQuestionDto.
+    ///
+    /// The frontend should render each question according to its Type:
+    ///   * MultipleChoice -> a radio-button / dropdown list built from Options.
+    ///   * OpenEnded      -> a free-text textarea.
+    ///
+    /// Contact questions (indices 0-6) are always OpenEnded-style text fields for
+    /// email/name/phone/etc. Business questions (index 7+) may be EITHER
+    /// MultipleChoice or OpenEnded, exactly like an assessment mixes MCQs and
+    /// OpenQuestions.
+    /// </summary>
+    public enum SurveyQuestionType
+    {
+        /// <summary>
+        /// Closed question with a list of selectable Options. Respondent picks one.
+        /// Rendered as radio buttons / dropdown on the frontend.
+        /// </summary>
+        MultipleChoice,
+
+        /// <summary>
+        /// Open free-text question. Respondent writes their own answer.
+        /// Rendered as a textarea on the frontend.
+        /// </summary>
+        OpenEnded
+    }
+
+    /// <summary>
     /// Open-ended survey question for market research (no scoring).
     /// Questions are categorized as either Contact (mandatory, prepended) or Business (custom).
     /// Contact questions are ALWAYS questions 0-6:
@@ -27,13 +61,65 @@ namespace ProcessZero.Application.Dtos
     ///   5: Job
     ///   6: Industry
     /// Business questions start at index 7+
+    ///
+    /// QUESTION TYPES (mirrors the assessment model):
+    /// ==============================================
+    /// Just like assessments combine MCQs and OpenQuestions, a survey's Business
+    /// questions can EACH be either:
+    ///   - MultipleChoice: provide the `Options` list; the respondent selects one.
+    ///   - OpenEnded:      `Options` stays empty; the respondent types a free answer.
+    ///
+    /// Examples:
+    ///   // Open-ended business question (like OpenQuestionDto in assessments)
+    ///   new SurveyQuestionDto { Type = SurveyQuestionType.OpenEnded,
+    ///                           Text = "What is your biggest scheduling pain point?" }
+    ///
+    ///   // Multiple-choice business question (like QuestionDto in assessments, no scoring)
+    ///   new SurveyQuestionDto { Type = SurveyQuestionType.MultipleChoice,
+    ///                           Text = "Which best describes your team size?",
+    ///                           Options = new() { "1-10", "11-50", "51-200", "200+" } }
+    ///
+    /// The frontend stores the respondent's answer as a single string in the
+    /// `answers` array (the chosen option text for MultipleChoice, or the typed
+    /// text for OpenEnded) — same position as the question index.
     /// </summary>
     public class SurveyQuestionDto
     {
         public int Id { get; set; }
+
+        /// <summary>
+        /// The question prompt shown to the respondent.
+        /// </summary>
         public string Text { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Whether the respondent MUST answer this question.
+        /// For Contact questions 0-3 (email, firstName, lastName, phone) this is
+        /// enforced as required by the service; Company/Job/Industry are optional.
+        /// </summary>
         public bool IsRequired { get; set; } = true;
+
+        /// <summary>
+        /// Contact (mandatory, prepended, indices 0-6) or Business (custom, 7+).
+        /// </summary>
         public QuestionCategory Category { get; set; } = QuestionCategory.Business;
+
+        /// <summary>
+        /// Type of question — MultipleChoice or OpenEnded.
+        /// Defaults to OpenEnded (the historical behavior: free-text answers).
+        /// Set to MultipleChoice and populate <see cref="Options"/> to give the
+        /// respondent a fixed list to choose from (mirrors assessment MCQs).
+        /// </summary>
+        public SurveyQuestionType Type { get; set; } = SurveyQuestionType.OpenEnded;
+
+        /// <summary>
+        /// Selectable options for a MultipleChoice question.
+        /// Ignored / left empty for OpenEnded questions. The frontend renders these
+        /// as radio buttons or a dropdown, and stores the CHOSEN option's text as the
+        /// answer string (same as assessment MCQ answers, but surveys are not scored
+        /// so there is no CorrectIndex to track).
+        /// </summary>
+        public List<string> Options { get; set; } = new List<string>();
     }
 
     /// <summary>
@@ -53,6 +139,11 @@ namespace ProcessZero.Application.Dtos
     ///   Questions[5]: "Job Title" (Contact, Optional)
     ///   Questions[6]: "Industry" (Contact, Optional)
     ///   Questions[7+]: Admin-provided business questions
+    /// 
+    /// Business questions (7+) may be MULTIPLE-CHOICE or OPEN-ENDED, exactly like an
+    /// assessment mixes MCQs and OpenQuestions:
+    ///   - MultipleChoice: set Type = MultipleChoice and provide Options.
+    ///   - OpenEnded:      leave Type = OpenEnded (default), Options empty.
     /// </summary>
     public class SurveyDto
     {
@@ -63,6 +154,8 @@ namespace ProcessZero.Application.Dtos
         public string Status { get; set; } = "Active";
         /// <summary>
         /// Business/pain point questions. Contact questions are automatically prepended by service.
+        /// Each question is either MultipleChoice (has Options) or OpenEnded (free text),
+        /// mirroring the assessment question model.
         /// </summary>
         public List<SurveyQuestionDto> Questions { get; set; } = new List<SurveyQuestionDto>();
     }
@@ -75,7 +168,11 @@ namespace ProcessZero.Application.Dtos
     ///   - Indices 0-6: Contact information questions (email, name, phone, company, job, industry)
     ///   - Indices 7+: Business/pain point questions
     /// 
-    /// Answers array should have same length as Questions array.
+    /// Each question carries its own Type (MultipleChoice/OpenEnded) and, for
+    /// MultipleChoice, the Options list — so the client knows whether to render a
+    /// textarea or a radio/dropdown, exactly like the assessment client DTO.
+    /// 
+    /// Answers array should have one entry per question, in the same order.
     /// </summary>
     public class SurveyClientDto
     {
@@ -85,7 +182,8 @@ namespace ProcessZero.Application.Dtos
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         /// <summary>
-        /// ALL questions including mandatory contact questions (0-6) and business questions (7+)
+        /// ALL questions including mandatory contact questions (0-6) and business questions (7+).
+        /// Each item specifies its Type and Options so the UI can render MCQ vs open-ended.
         /// </summary>
         public List<SurveyQuestionDto> Questions { get; set; } = new List<SurveyQuestionDto>();
     }
@@ -119,9 +217,13 @@ namespace ProcessZero.Application.Dtos
     ///   answers[6]: Industry (optional, can be empty string)
     /// 
     /// Business answers (start at index 7):
-    ///   answers[7+]: Responses to pain point questions
+    ///   answers[7+]: Responses to pain point questions.
+    ///   - For OpenEnded questions: the typed free-text answer.
+    ///   - For MultipleChoice questions: the TEXT of the chosen option
+    ///     (exactly as provided in SurveyQuestionDto.Options) — surveys are not
+    ///     scored, so only the selected value is stored, no index/CorrectIndex.
     /// 
-    /// Example:
+    /// Example (mix of open-ended and multiple-choice like an assessment):
     ///   {
     ///     "surveyId": 1,
     ///     "answers": [
@@ -132,9 +234,9 @@ namespace ProcessZero.Application.Dtos
     ///       "Acme Corp",                           // [4] Company
     ///       "Operations Manager",                  // [5] Job
     ///       "Manufacturing",                       // [6] Industry
-    ///       "Our scheduling is manual...",         // [7] Q1 Answer
-    ///       "We use Excel and email...",           // [8] Q2 Answer
-    ///       "$15,000/month on coordination..."     // [9] Q3 Answer
+    ///       "We still use spreadsheets",           // [7] Open-ended answer
+    ///       "11-50",                               // [8] Multiple-choice: selected option text
+    ///       "$15,000/month on coordination..."     // [9] Open-ended answer
     ///     ]
     ///   }
     /// </summary>
@@ -148,7 +250,7 @@ namespace ProcessZero.Application.Dtos
         /// <summary>
         /// Answers array with ONE string per question.
         /// Index 0-6: Contact information responses
-        /// Index 7+: Business question responses
+        /// Index 7+: Business question responses (open-ended text OR chosen MCQ option text)
         /// </summary>
         public List<string> Answers { get; set; } = new List<string>();
     }
@@ -171,7 +273,9 @@ namespace ProcessZero.Application.Dtos
         public string? Industry { get; set; }
         /// <summary>
         /// Business question answers only (indices 7+ from submission).
-        /// Contact information is stored in separate properties above.
+        /// For MultipleChoice questions this holds the chosen option text; for
+        /// OpenEnded questions the typed free-text. Contact information is stored in
+        /// separate properties above.
         /// </summary>
         public List<string> Answers { get; set; } = new List<string>();
         public DateTime SubmittedAt { get; set; }

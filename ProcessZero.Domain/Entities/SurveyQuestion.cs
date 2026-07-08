@@ -10,6 +10,25 @@ namespace ProcessZero.Domain.Entities
     /// Stores a market research survey definition with questions.
     /// Each survey is independent with its own set of questions, responses, and respondents.
     /// Base contact questions (7 fields) are automatically prepended when survey is retrieved.
+    ///
+    /// QUESTION STRUCTURE (mirrors the assessment MCQ + OpenEnded model):
+    /// ================================================================
+    /// The <see cref="QuestionsJson"/> column stores a serialised SurveyDto whose
+    /// Questions list mixes TWO question types, exactly like an assessment mixes
+    /// MCQs and OpenQuestions:
+    ///   - MultipleChoice: a closed question with a fixed list of `Options` the
+    ///                     respondent picks from (equivalent to assessment QuestionDto,
+    ///                     but surveys are NOT scored, so no CorrectIndex is stored).
+    ///   - OpenEnded:      a free-text question the respondent answers in their own
+    ///                     words (equivalent to assessment OpenQuestionDto).
+    ///
+    /// The complete stored order is:
+    ///   [0-6]  Contact questions (always OpenEnded text fields: email, name, phone, ...)
+    ///   [7+]   Admin business questions, each EITHER MultipleChoice or OpenEnded.
+    ///
+    /// Answers are stored per-response in SurveyResponse.AnswersJson as a flat list of
+    /// strings (one per question, in the same order): the typed text for OpenEnded
+    /// questions, or the CHOSEN option's text for MultipleChoice questions.
     /// </summary>
     public class SurveyQuestion : BaseEntity
     {
@@ -29,7 +48,11 @@ namespace ProcessZero.Domain.Entities
         public string Description { get; set; } = string.Empty;
 
         /// <summary>
-        /// Full survey payload serialised as JSON (list of business questions only, contact questions are prepended automatically)
+        /// Full survey payload serialised as JSON.
+        /// Contains the complete Questions list (contact questions prepended by the
+        /// service + admin business questions). Each question carries its Type
+        /// (MultipleChoice/OpenEnded) and, for MultipleChoice, the Options list —
+        /// mirroring how an assessment stores MCQs + OpenQuestions.
         /// </summary>
         public string QuestionsJson { get; set; } = string.Empty;
 

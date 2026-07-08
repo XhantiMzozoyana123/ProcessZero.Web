@@ -63,6 +63,37 @@ namespace ProcessZero.Web.Controllers
     ///   - AnswersJson: Full answers array (0-6 contact + 7+ business)
     ///   - SubmittedAt: Response timestamp
     /// 
+    /// QUESTION TYPES — MULTIPLE-CHOICE & OPEN-ENDED (mirrors the assessment model):
+    /// ============================================================================
+    /// Just like assessments combine MCQs and OpenQuestions, each survey's BUSINESS
+    /// questions (indices 7+) can be EITHER:
+    ///   • MultipleChoice: a closed question with an `Options` list; the respondent
+    ///     picks one option. Rendered by the UI as radio buttons / dropdown.
+    ///   • OpenEnded:      a free-text question; the respondent types their own
+    ///     answer. Rendered by the UI as a textarea.
+    /// Contact questions (0-6) are always OpenEnded-style text fields.
+    /// Each question carries its `Type` and (for MultipleChoice) its `Options`
+    /// (see SurveyQuestionDto / SurveyQuestionType). The frontend MUST read
+    /// question.Type to decide which control to render.
+    /// When submitting, a MultipleChoice answer is stored as the CHOSEN OPTION'S
+    /// TEXT (surveys are NOT scored, so there is no CorrectIndex like assessments).
+    /// 
+    /// DATABASE COLUMNS / ENTITIES:
+    /// ============================
+    /// SurveyQuestion (table: SurveyQuestions)
+    ///   - Id, Name, Title, Description, Status, UploadedAt
+    ///   - QuestionsJson: serialised SurveyDto. Stores the COMPLETE question list
+    ///     (contact 0-6 + business 7+), each with Type (MultipleChoice/OpenEnded)
+    ///     and Options. This is the single source of truth for survey structure.
+    /// SurveyRespondent (table: SurveyRespondents)
+    ///   - Id, SurveyId (FK, unique per SurveyId+Email), UserId, CreatedAt
+    ///   - Email, FirstName, LastName, Phone, Company, Job, Industry
+    ///     (extracted from answers[0-6]; one row per unique survey+email)
+    /// SurveyResponse (table: SurveyResponses)
+    ///   - Id, SurveyId (FK), SurveyRespondentId (FK), UserId, CreatedAt
+    ///   - AnswersJson: serialised List<string> — ONE string per question in order
+    ///     (contact text + business answers; MCQ answers hold the chosen option text)
+    ///   - SubmittedAt
     /// LeadLakes:
 ///   - Auto-populated by LLM qualification
 ///   - Email-based deduplication (global across surveys)
@@ -155,11 +186,14 @@ namespace ProcessZero.Web.Controllers
         /// Error Cases:
         ///   404 Not Found: Survey not found or not Active status
         /// 
-        /// Frontend should render all questions in order.
-        /// Respondent should prepare answers array with same length.
-        /// </summary>
-        [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetSurvey(int id, CancellationToken cancellationToken)
+    /// Frontend should render all questions in order. For each question, read its
+    /// `Type`: render a textarea for OpenEnded, or radio buttons / dropdown built
+    /// from `Options` for MultipleChoice (mirrors the assessment client DTO).
+    /// Respondent should prepare answers array with same length: open-ended -> typed
+    /// text; multiple-choice -> the TEXT of the chosen option.
+    /// </summary>
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetSurvey(int id, CancellationToken cancellationToken)
         {
             var survey = await _surveyService.GetSurveyAsync(id, cancellationToken);
             if (survey == null)
@@ -193,9 +227,10 @@ namespace ProcessZero.Web.Controllers
         ///   2. Validates answers[0-6] contains all required contact info
         ///   3. Extracts contact: email, firstName, lastName, phone, company, job, industry
         ///   4. Creates/retrieves SurveyRespondent (unique by SurveyId + Email)
-        ///   5. Creates SurveyResponse with full answers array
-        ///   6. Calls ILLMService to validate pain points
-        ///   7. If qualified, adds respondent to LeadLake
+    ///   5. Creates SurveyResponse with full answers array
+    ///      (open-ended answers = typed text; multiple-choice answers = chosen option text)
+    ///   6. Calls ILLMService to validate pain points
+    ///   7. If qualified, adds respondent to LeadLake
         /// 
         /// Returns: SurveyResponseResultDto
         ///   - Id: SurveyResponse.Id
