@@ -55,7 +55,7 @@ namespace ProcessZero.Infrastructure.Services
             using var message = new MailMessage(fromAddress, toAddress)
             {
                 Subject = subject,
-                Body = body,
+                Body = ConvertPlainTextToHtml(body),
                 IsBodyHtml = true
             };
 
@@ -73,6 +73,17 @@ namespace ProcessZero.Infrastructure.Services
 
             // Send asynchronously
             await client.SendMailAsync(message);
+        }
+
+        private static string ConvertPlainTextToHtml(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+
+            // 1. Encode first so malicious code isn't injected
+            string encoded = WebUtility.HtmlEncode(text);
+
+            // 2. Replace newlines with HTML break tags
+            return encoded.Replace("\r\n", "<br />").Replace("\n", "<br />");
         }
     }
 }
