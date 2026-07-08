@@ -23,17 +23,15 @@ namespace ProcessZero.Infrastructure.Services
 {
     public class ExtractService : IExtractService
     {
-        private readonly ApplicationDbContext _context;
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IAIExtractorService _aiExtractService;
-        public ExtractService(ApplicationDbContext context, 
+        public ExtractService(
             IDbContextFactory<ApplicationDbContext> contextFactory, 
             IAIExtractorService aiExtractService,
             IHttpClientFactory httpClientFactory)
         {
-            _context = context;
             _contextFactory = contextFactory;
             _httpClientFactory = httpClientFactory;
             _aiExtractService = aiExtractService;
@@ -201,7 +199,7 @@ namespace ProcessZero.Infrastructure.Services
             {
                 var client = _httpClientFactory.CreateClient();
 
-                string url = $"http://localhost:8000/transcript?url={videoUrl}";
+                string url = $"http://46.202.170.203:8000/transcript?url={videoUrl}";
 
                 string result = await client.GetStringAsync(url);
 
@@ -211,28 +209,6 @@ namespace ProcessZero.Infrastructure.Services
             {
                 return string.Empty;
             }
-        }
-
-        private static async Task<string> GetFullNameofEmailAddressOwner(string input)
-        {
-            try
-            {
-                string email = input.Trim().ToLower();
-
-                using var md5 = MD5.Create();
-                byte[] hashBytes = md5.ComputeHash(Encoding.UTF8.GetBytes(email));
-
-                string hash = BitConverter.ToString(hashBytes)
-                    .Replace("-", "")
-                    .ToLower();
-
-                string gravatarUrl = $"https://www.gravatar.com/{hash}.json";
-            }
-            catch (Exception ex)
-            {
-                // Handle exceptions (e.g., log the error)
-            }
-            return string.Empty;
         }
     }
 }
