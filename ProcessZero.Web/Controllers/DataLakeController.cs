@@ -10,6 +10,7 @@ namespace ProcessZero.Web.Controllers
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "Admin")]
     public class DataLakeController : ControllerBase
     {
         private readonly IDataLakeService _dataLakeService;
