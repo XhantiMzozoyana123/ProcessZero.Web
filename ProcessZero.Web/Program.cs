@@ -55,8 +55,9 @@ static bool IsRunningInKubernetes()
 // -----------------------------
 // CONFIGURATION
 // -----------------------------
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException("Connection string 'DefaultConnection' not found or is empty.");
 
 // -----------------------------
 // DATABASE (EF CORE) & FACTORY
