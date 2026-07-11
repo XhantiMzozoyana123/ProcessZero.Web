@@ -20,7 +20,7 @@ namespace ProcessZero.Domain.Entities
         /// <summary>
         /// Navigation property to the survey
         /// </summary>
-        public SurveyQuestion? Survey { get; set; }
+        public Survey? Survey { get; set; }
 
         /// <summary>
         /// Email address (unique per survey, composite key: SurveyId + Email)

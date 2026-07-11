@@ -5,42 +5,51 @@ using ProcessZero.Application.Interfaces;
 using System.Text.Json;
 
 /*
- Entity reference (used by this controller / service):
-
- SurveyQuestion (table: SurveyQuestions)
- - Id (int)                : primary key (inherited from BaseEntity)
- - Name (string)          : unique survey identifier
- - Title (string)         : display title shown to respondents
- - Description (string)   : human-friendly description
- - QuestionsJson (string) : serialized SurveyDto containing all questions (contact + business)
- - Status (string)        : "Active" | "Draft" | "Archived" | "Closed"
- - UploadedAt (DateTime)  : last uploaded/modified timestamp
-
- SurveyRespondent (table: SurveyRespondents)
- - Id (int)               : primary key (inherited from BaseEntity)
- - SurveyId (int)         : FK to SurveyQuestions.Id
- - Email (string)         : respondent email (unique per SurveyId)
- - FirstName (string)     : contact first name
- - LastName (string)      : contact last name
- - Phone (string)         : contact phone number
- - Company (string)       : optional company
- - Job (string)           : optional job title
- - Industry (string)      : optional industry
- - CreatedAt/UpdatedAt    : audit timestamps (BaseEntity)
-
- SurveyResponse (table: SurveyResponses)
- - Id (int)               : primary key (inherited from BaseEntity)
- - SurveyId (int)         : FK to SurveyQuestions.Id
- - SurveyRespondentId(int): FK to SurveyRespondent.Id
- - AnswersJson (string)   : serialized List<string> with answers for every question
-                           (indices 0-6 = contact fields, 7+ = business answers)
- - SubmittedAt (DateTime) : when the respondent submitted the survey
- - CreatedAt/UpdatedAt    : audit timestamps (BaseEntity)
-
- These entities are used by the SurveyService to store definitions, contact
- records and per-respondent submissions. The controller delegates business
- logic to ISurveyService which enforces required contact fields and status.
-*/
+ * RELATIONAL SURVEY SYSTEM — Entity reference (used by this controller / service):
+ *
+ * The survey system was redesigned to use a proper relational structure instead
+ * of serializing the entire survey and all answers into JSON blobs. Each question
+ * and each answer is now stored as its own row, enabling normalised querying,
+ * indexing, and reporting.
+ *
+ * Survey (table: Surveys)
+ * - Id (int)                : primary key (inherited from BaseEntity)
+ * - Name (string)           : unique survey identifier
+ * - Title (string)          : display title shown to respondents
+ * - Description (string)    : human-friendly description
+ * - Status (string)         : "Active" | "Draft" | "Archived" | "Closed"
+ * - UploadedAt (DateTime)   : last uploaded/modified timestamp
+ *
+ * SurveyQuestion (table: SurveyQuestions)
+ * - Id (int)                : primary key (inherited from BaseEntity)
+ * - SurveyId (int)          : FK to Surveys.Id
+ * - Text (string)           : the question prompt
+ * - Order (int)             : display order (0-6 = contact, 7+ = business)
+ * - Category (enum)         : Contact | Business
+ * - Type (enum)             : MultipleChoice | OpenEnded
+ * - IsRequired (bool)       : whether the question must be answered
+ * - OptionsJson (string?)   : JSON array of options (MultipleChoice only)
+ *
+ * SurveyRespondent (table: SurveyRespondents)
+ * - Id (int)               : primary key (inherited from BaseEntity)
+ * - SurveyId (int)         : FK to Surveys.Id (unique per SurveyId + Email)
+ * - Email / FirstName / LastName / Phone / Company / Job / Industry (string)
+ *
+ * SurveyResponse (table: SurveyResponses)
+ * - Id (int)               : primary key (inherited from BaseEntity)
+ * - SurveyId (int)         : FK to Surveys.Id
+ * - SurveyRespondentId(int): FK to SurveyRespondent.Id
+ * - SubmittedAt (DateTime) : when the respondent submitted the survey
+ *
+ * SurveyAnswer (table: SurveyAnswers)
+ * - Id (int)               : primary key (inherited from BaseEntity)
+ * - SurveyResponseId (int) : FK to SurveyResponses.Id
+ * - SurveyQuestionId (int) : FK to SurveyQuestions.Id
+ * - AnswerText (string)    : the respondent's answer for that specific question
+ *
+ * The controller delegates all business logic to ISurveyService, which enforces
+ * required contact fields, survey status, and writes each answer as a row.
+ */
 
 namespace ProcessZero.Web.Controllers
 {
@@ -55,6 +64,12 @@ namespace ProcessZero.Web.Controllers
             _surveyService = surveyService;
         }
 
+        /// <summary>
+        /// GET api/survey/{id}
+        /// Public endpoint. Returns the active survey with all its questions
+        /// (contact questions 0-6 prepended, business questions 7+).
+        /// Questions are read from the SurveyQuestions table, not from JSON.
+        /// </summary>
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetSurvey(int id, CancellationToken cancellationToken)
         {
@@ -65,6 +80,12 @@ namespace ProcessZero.Web.Controllers
             return Ok(survey);
         }
 
+        /// <summary>
+        /// POST api/survey/submit
+        /// Public endpoint. Accepts a submission body { surveyId, answers[] }.
+        /// Each answer maps positionally to a SurveyQuestion row (ordered by Order).
+        /// The service stores one SurveyAnswer row per question.
+        /// </summary>
         [HttpPost("submit")]
         public async Task<IActionResult> SubmitResponse([FromBody] System.Text.Json.JsonElement submissionBody, CancellationToken cancellationToken)
         {
@@ -139,6 +160,11 @@ namespace ProcessZero.Web.Controllers
             }
         }
 
+        /// <summary>
+        /// GET api/survey
+        /// Admin endpoint. Lists all surveys with response counts.
+        /// Reads from the Surveys table.
+        /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpGet]
         public async Task<IActionResult> ListSurveys(CancellationToken cancellationToken)
@@ -147,6 +173,12 @@ namespace ProcessZero.Web.Controllers
             return Ok(surveys);
         }
 
+        /// <summary>
+        /// POST api/survey  (or api/survey/s)
+        /// Admin endpoint. Creates a new survey. Contact questions are added
+        /// automatically as SurveyQuestion rows (Order 0-6); the supplied business
+        /// questions become rows 7+.
+        /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpPost]
         [Route("", Name = "CreateSurveyRoot")]
@@ -181,6 +213,12 @@ namespace ProcessZero.Web.Controllers
             }
         }
 
+        /// <summary>
+        /// PUT api/survey/{id}
+        /// Admin endpoint. Updates an existing survey. All SurveyQuestion rows are
+        /// replaced (contact questions re-prepended, business questions re-added).
+        /// Existing SurveyAnswer rows are cascade-deleted with the questions.
+        /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdateSurvey(int id, [FromBody] JsonElement body, CancellationToken cancellationToken)
@@ -216,6 +254,11 @@ namespace ProcessZero.Web.Controllers
             }
         }
 
+        /// <summary>
+        /// DELETE api/survey/{id}
+        /// Admin endpoint. Hard-deletes a survey. Cascade deletes its questions,
+        /// respondents, responses, and answers.
+        /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeleteSurvey(int id, CancellationToken cancellationToken)
@@ -231,6 +274,11 @@ namespace ProcessZero.Web.Controllers
             }
         }
 
+        /// <summary>
+        /// GET api/survey/{id}/admin
+        /// Admin endpoint. Returns the survey definition with its business
+        /// questions (SurveyQuestion rows where Category = Business).
+        /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpGet("{id:int}/admin")]
         public async Task<IActionResult> GetSurveyForAdmin(int id, CancellationToken cancellationToken)
@@ -242,6 +290,11 @@ namespace ProcessZero.Web.Controllers
             return Ok(survey);
         }
 
+        /// <summary>
+        /// GET api/survey/{id}/responses
+        /// Admin endpoint. Returns all responses for a survey. Each response's
+        /// answers are reconstructed from SurveyAnswer rows joined to SurveyQuestion.
+        /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpGet("{id:int}/responses")]
         public async Task<IActionResult> GetSurveyResponses(int id, CancellationToken cancellationToken)
@@ -250,6 +303,11 @@ namespace ProcessZero.Web.Controllers
             return Ok(summary);
         }
 
+        /// <summary>
+        /// GET api/survey/response/{responseId}
+        /// Admin endpoint. Returns a single response (with contact info and
+        /// per-question answers loaded from SurveyAnswer rows).
+        /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpGet("response/{responseId:int}")]
         public async Task<IActionResult> GetResponseById(int responseId, CancellationToken cancellationToken)

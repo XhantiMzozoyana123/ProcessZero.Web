@@ -1,72 +1,79 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace ProcessZero.Domain.Entities
 {
     /// <summary>
-    /// Stores a market research survey definition with questions.
-    /// Each survey is independent with its own set of questions, responses, and respondents.
-    /// Base contact questions (7 fields) are automatically prepended when survey is retrieved.
-    ///
-    /// QUESTION STRUCTURE (mirrors the assessment MCQ + OpenEnded model):
-    /// ================================================================
-    /// The <see cref="QuestionsJson"/> column stores a serialised SurveyDto whose
-    /// Questions list mixes TWO question types, exactly like an assessment mixes
-    /// MCQs and OpenQuestions:
-    ///   - MultipleChoice: a closed question with a fixed list of `Options` the
-    ///                     respondent picks from (equivalent to assessment QuestionDto,
-    ///                     but surveys are NOT scored, so no CorrectIndex is stored).
-    ///   - OpenEnded:      a free-text question the respondent answers in their own
-    ///                     words (equivalent to assessment OpenQuestionDto).
-    ///
-    /// The complete stored order is:
-    ///   [0-6]  Contact questions (always OpenEnded text fields: email, name, phone, ...)
-    ///   [7+]   Admin business questions, each EITHER MultipleChoice or OpenEnded.
-    ///
-    /// Answers are stored per-response in SurveyResponse.AnswersJson as a flat list of
-    /// strings (one per question, in the same order): the typed text for OpenEnded
-    /// questions, or the CHOSEN option's text for MultipleChoice questions.
+    /// Category of survey question: Contact (mandatory contact info) or Business (custom pain point questions)
+    /// </summary>
+    public enum QuestionCategory
+    {
+        Contact,
+        Business
+    }
+
+    /// <summary>
+    /// Type of survey question: MultipleChoice (has fixed options) or OpenEnded (free text)
+    /// </summary>
+    public enum SurveyQuestionType
+    {
+        MultipleChoice,
+        OpenEnded
+    }
+
+    /// <summary>
+    /// Individual question within a survey.
+    /// Each question belongs to a Survey and can be either MultipleChoice or OpenEnded.
+    /// Contact questions (email, name, phone, company, job, industry) are marked with Category = Contact.
     /// </summary>
     public class SurveyQuestion : BaseEntity
     {
         /// <summary>
-        /// Unique name/identifier for the survey (e.g., "Market Research Q1 2025")
+        /// Foreign key to the survey this question belongs to
         /// </summary>
-        public string Name { get; set; } = string.Empty;
+        public int SurveyId { get; set; }
 
         /// <summary>
-        /// Display title shown to respondents
+        /// Navigation property to the survey
         /// </summary>
-        public string Title { get; set; } = string.Empty;
+        public Survey? Survey { get; set; }
 
         /// <summary>
-        /// Optional human-friendly description explaining the survey purpose
+        /// The question text shown to respondents
         /// </summary>
-        public string Description { get; set; } = string.Empty;
+        [MaxLength(500)]
+        public string Text { get; set; } = string.Empty;
 
         /// <summary>
-        /// Full survey payload serialised as JSON.
-        /// Contains the complete Questions list (contact questions prepended by the
-        /// service + admin business questions). Each question carries its Type
-        /// (MultipleChoice/OpenEnded) and, for MultipleChoice, the Options list —
-        /// mirroring how an assessment stores MCQs + OpenQuestions.
+        /// Display order within the survey (0-6 for contact questions, 7+ for business questions)
         /// </summary>
-        public string QuestionsJson { get; set; } = string.Empty;
+        public int Order { get; set; }
 
         /// <summary>
-        /// Survey status: "Active", "Draft", "Archived", "Closed"
+        /// Category of question: Contact (mandatory contact info) or Business (custom pain point questions)
         /// </summary>
-        public string Status { get; set; } = "Active";
+        public QuestionCategory Category { get; set; } = QuestionCategory.Business;
 
         /// <summary>
-        /// Timestamp when survey was last uploaded/updated
+        /// Whether the respondent MUST answer this question.
+        /// Contact questions 0-3 (email, firstName, lastName, phone) are typically required.
+        /// Company/Job/Industry are optional.
         /// </summary>
-        public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+        public bool IsRequired { get; set; } = true;
 
-        // Navigation property for responses
-        public ICollection<SurveyResponse> Responses { get; set; } = new List<SurveyResponse>();
+        /// <summary>
+        /// Type of question: MultipleChoice (has fixed options) or OpenEnded (free text).
+        /// Contact questions are always OpenEnded.
+        /// Business questions can be either type.
+        /// </summary>
+        public SurveyQuestionType Type { get; set; } = SurveyQuestionType.OpenEnded;
+
+        /// <summary>
+        /// Selectable options for MultipleChoice questions (stored as JSON array).
+        /// Empty for OpenEnded questions.
+        /// </summary>
+        public string? OptionsJson { get; set; } = "[]";
     }
 }

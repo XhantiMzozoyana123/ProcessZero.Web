@@ -121,12 +121,19 @@ namespace ProcessZero.Domain
             });
 
             // Survey — UserId
-            modelBuilder.Entity<SurveyQuestion>(e =>
+            modelBuilder.Entity<Survey>(e =>
             {
                 e.Property(r => r.UserId).HasMaxLength(450);
                 e.Property(r => r.Name).HasMaxLength(255).IsRequired();
                 e.Property(r => r.Title).HasMaxLength(200);
                 e.Property(r => r.Status).HasMaxLength(50).HasDefaultValue("Active");
+            });
+
+            modelBuilder.Entity<SurveyQuestion>(e =>
+            {
+                e.Property(r => r.UserId).HasMaxLength(450);
+                e.Property(r => r.Text).HasMaxLength(500).IsRequired();
+                e.Property(r => r.OptionsJson).HasMaxLength(2000);
             });
 
             modelBuilder.Entity<SurveyRespondent>(e =>
@@ -145,6 +152,12 @@ namespace ProcessZero.Domain
             {
                 e.Property(r => r.UserId).HasMaxLength(450);
             });
+
+            modelBuilder.Entity<SurveyAnswer>(e =>
+            {
+                e.Property(r => r.AnswerText).HasMaxLength(2000);
+            });
+
 
             // Inboxes — UserId
             modelBuilder.Entity<Inbox>(e =>
@@ -208,14 +221,26 @@ namespace ProcessZero.Domain
             });
 
             // Survey: multiple independent surveys with their own responses and respondents
-            modelBuilder.Entity<SurveyQuestion>(e =>
+            modelBuilder.Entity<Survey>(e =>
             {
-                e.HasIndex(r => r.Status).HasDatabaseName("IX_SurveyQuestions_Status");
+                e.HasIndex(r => r.Status).HasDatabaseName("IX_Surveys_Status");
                 e.HasIndex(r => r.UploadedAt)
-                 .HasDatabaseName("IX_SurveyQuestions_UploadedAt")
+                 .HasDatabaseName("IX_Surveys_UploadedAt")
                  .IsDescending(true);
                 e.HasIndex(r => new { r.UserId, r.Status })
-                 .HasDatabaseName("IX_SurveyQuestions_UserId_Status");
+                 .HasDatabaseName("IX_Surveys_UserId_Status");
+            });
+
+            modelBuilder.Entity<SurveyQuestion>(e =>
+            {
+                e.HasIndex(r => new { r.SurveyId, r.Order })
+                 .HasDatabaseName("IX_SurveyQuestions_SurveyId_Order");
+
+                // Foreign key to Survey
+                e.HasOne(r => r.Survey)
+                 .WithMany(s => s.Questions)
+                 .HasForeignKey(r => r.SurveyId)
+                 .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<SurveyRespondent>(e =>
@@ -229,7 +254,7 @@ namespace ProcessZero.Domain
 
                 // Foreign key to Survey
                 e.HasOne(r => r.Survey)
-                 .WithMany()
+                 .WithMany(s => s.Respondents)
                  .HasForeignKey(r => r.SurveyId)
                  .OnDelete(DeleteBehavior.Cascade);
             });
@@ -257,6 +282,24 @@ namespace ProcessZero.Domain
                  .OnDelete(DeleteBehavior.Cascade);
             });
 
+            modelBuilder.Entity<SurveyAnswer>(e =>
+            {
+                e.HasIndex(r => new { r.SurveyResponseId, r.SurveyQuestionId })
+                 .HasDatabaseName("IX_SurveyAnswers_ResponseId_QuestionId")
+                 .IsUnique();
+
+                // Foreign key to SurveyResponse
+                e.HasOne(r => r.SurveyResponse)
+                 .WithMany(sr => sr.Answers)
+                 .HasForeignKey(r => r.SurveyResponseId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                // Foreign key to SurveyQuestion
+                e.HasOne(r => r.SurveyQuestion)
+                 .WithMany()
+                 .HasForeignKey(r => r.SurveyQuestionId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
 
             // LeadLakes: filtered by UserId, Email
             modelBuilder.Entity<LeadLake>(e =>
@@ -448,11 +491,16 @@ namespace ProcessZero.Domain
 
         public DbSet<Assessment> Assessments { get; set; }
 
+        public DbSet<Survey> Surveys { get; set; }
+
         public DbSet<SurveyQuestion> SurveyQuestions { get; set; }
 
         public DbSet<SurveyResponse> SurveyResponses { get; set; }
 
         public DbSet<SurveyRespondent> SurveyRespondents { get; set; }
+
+        public DbSet<SurveyAnswer> SurveyAnswers { get; set; }
+
 
         public DbSet<RelayEmailAccount> RelayEmailAccounts { get; set; }
 

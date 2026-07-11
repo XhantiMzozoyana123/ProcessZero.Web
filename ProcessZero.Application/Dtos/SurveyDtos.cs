@@ -1,54 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using ProcessZero.Domain.Entities;
 
 namespace ProcessZero.Application.Dtos
 {
-    /// <summary>
-    /// Question category type (Contact or Business).
-    /// Contact questions (email, name, phone, etc.) are mandatory and prepended to all surveys.
-    /// Business questions are custom pain point questions added by admin.
-    /// </summary>
-    public enum QuestionCategory
-    {
-        Contact,  // Mandatory contact information questions
-        Business  // Custom business/pain point questions
-    }
-
-    /// <summary>
-    /// Type of question — mirrors the assessment question model (MCQ + OpenEnded).
-    ///
-    /// This brings the survey question structure in line with how assessments work:
-    ///   - MultipleChoice: a closed question with a fixed set of `Options` the
-    ///                     respondent picks from. Equivalent to assessment QuestionDto
-    ///                     (but surveys are NOT scored, so there is no CorrectIndex).
-    ///   - OpenEnded:      a free-text question the respondent answers in their own
-    ///                     words. Equivalent to assessment OpenQuestionDto.
-    ///
-    /// The frontend should render each question according to its Type:
-    ///   * MultipleChoice -> a radio-button / dropdown list built from Options.
-    ///   * OpenEnded      -> a free-text textarea.
-    ///
-    /// Contact questions (indices 0-6) are always OpenEnded-style text fields for
-    /// email/name/phone/etc. Business questions (index 7+) may be EITHER
-    /// MultipleChoice or OpenEnded, exactly like an assessment mixes MCQs and
-    /// OpenQuestions.
-    /// </summary>
-    public enum SurveyQuestionType
-    {
-        /// <summary>
-        /// Closed question with a list of selectable Options. Respondent picks one.
-        /// Rendered as radio buttons / dropdown on the frontend.
-        /// </summary>
-        MultipleChoice,
-
-        /// <summary>
-        /// Open free-text question. Respondent writes their own answer.
-        /// Rendered as a textarea on the frontend.
-        /// </summary>
-        OpenEnded
-    }
-
     /// <summary>
     /// Open-ended survey question for market research (no scoring).
     /// Questions are categorized as either Contact (mandatory, prepended) or Business (custom).

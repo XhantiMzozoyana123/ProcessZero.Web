@@ -1,15 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.ComponentModel.DataAnnotations;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace ProcessZero.Domain.Entities
 {
     /// <summary>
-    /// Stores a submitted market research survey response.
+    /// Survey response submission from a respondent.
     /// Each response is linked to a specific survey and respondent.
-    /// Full answers (contact + business) are stored as JSON.
+    /// Contains multiple SurveyAnswer records (one per question).
     /// </summary>
     public class SurveyResponse : BaseEntity
     {
@@ -21,7 +20,7 @@ namespace ProcessZero.Domain.Entities
         /// <summary>
         /// Navigation property to the survey
         /// </summary>
-        public SurveyQuestion? Survey { get; set; }
+        public Survey? Survey { get; set; }
 
         /// <summary>
         /// Foreign key to the respondent who submitted this response
@@ -34,13 +33,11 @@ namespace ProcessZero.Domain.Entities
         public SurveyRespondent? Respondent { get; set; }
 
         /// <summary>
-        /// Full answers array serialized as JSON (indices 0-6: contact, 7+: business answers)
-        /// </summary>
-        public string? AnswersJson { get; set; }
-
-        /// <summary>
         /// Timestamp when response was submitted
         /// </summary>
         public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+
+        // Navigation property for answers
+        public ICollection<SurveyAnswer> Answers { get; set; } = new List<SurveyAnswer>();
     }
 }
