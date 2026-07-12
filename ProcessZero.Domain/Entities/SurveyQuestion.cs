@@ -27,6 +27,7 @@ namespace ProcessZero.Domain.Entities
     /// Individual question within a survey.
     /// Each question belongs to a Survey and can be either MultipleChoice or OpenEnded.
     /// Contact questions (email, name, phone, company, job, industry) are marked with Category = Contact.
+    /// Multiple-choice options are stored as individual SurveyQuestionOption rows (no JSON).
     /// </summary>
     public class SurveyQuestion : BaseEntity
     {
@@ -71,9 +72,9 @@ namespace ProcessZero.Domain.Entities
         public SurveyQuestionType Type { get; set; } = SurveyQuestionType.OpenEnded;
 
         /// <summary>
-        /// Selectable options for MultipleChoice questions (stored as JSON array).
+        /// Selectable options for a MultipleChoice question (one SurveyQuestionOption row per option).
         /// Empty for OpenEnded questions.
         /// </summary>
-        public string? OptionsJson { get; set; } = "[]";
+        public ICollection<SurveyQuestionOption> Options { get; set; } = new List<SurveyQuestionOption>();
     }
 }

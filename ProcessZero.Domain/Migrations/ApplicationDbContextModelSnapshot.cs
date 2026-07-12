@@ -1776,10 +1776,6 @@ namespace ProcessZero.Domain.Migrations
                     b.Property<bool>("IsRequired")
                         .HasColumnType("tinyint(1)");
 
-                    b.Property<string>("OptionsJson")
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)");
-
                     b.Property<int>("Order")
                         .HasColumnType("int");
 
@@ -1808,6 +1804,44 @@ namespace ProcessZero.Domain.Migrations
                         .HasDatabaseName("IX_SurveyQuestions_SurveyId_Order");
 
                     b.ToTable("SurveyQuestions");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestionOption", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SurveyQuestionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("varchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SurveyQuestionId", "Order")
+                        .HasDatabaseName("IX_SurveyQuestionOptions_QuestionId_Order");
+
+                    b.ToTable("SurveyQuestionOptions");
                 });
 
             modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyRespondent", b =>
@@ -2177,6 +2211,17 @@ namespace ProcessZero.Domain.Migrations
                     b.Navigation("Survey");
                 });
 
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestionOption", b =>
+                {
+                    b.HasOne("ProcessZero.Domain.Entities.SurveyQuestion", "SurveyQuestion")
+                        .WithMany("Options")
+                        .HasForeignKey("SurveyQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SurveyQuestion");
+                });
+
             modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyRespondent", b =>
                 {
                     b.HasOne("ProcessZero.Domain.Entities.Survey", "Survey")
@@ -2252,6 +2297,11 @@ namespace ProcessZero.Domain.Migrations
                     b.Navigation("Respondents");
 
                     b.Navigation("Responses");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestion", b =>
+                {
+                    b.Navigation("Options");
                 });
 
             modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyRespondent", b =>

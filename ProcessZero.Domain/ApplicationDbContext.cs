@@ -120,7 +120,7 @@ namespace ProcessZero.Domain
                 e.Property(s => s.UserId).HasMaxLength(450);
             });
 
-            // Survey — UserId
+            // Survey — UserId is optional to support system/admin operations
             modelBuilder.Entity<Survey>(e =>
             {
                 e.Property(r => r.UserId).HasMaxLength(450);
@@ -133,7 +133,12 @@ namespace ProcessZero.Domain
             {
                 e.Property(r => r.UserId).HasMaxLength(450);
                 e.Property(r => r.Text).HasMaxLength(500).IsRequired();
-                e.Property(r => r.OptionsJson).HasMaxLength(2000);
+            });
+
+            modelBuilder.Entity<SurveyQuestionOption>(e =>
+            {
+                e.Property(o => o.UserId).HasMaxLength(450);
+                e.Property(o => o.Text).HasMaxLength(255).IsRequired();
             });
 
             modelBuilder.Entity<SurveyRespondent>(e =>
@@ -299,6 +304,18 @@ namespace ProcessZero.Domain
                  .WithMany()
                  .HasForeignKey(r => r.SurveyQuestionId)
                  .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<SurveyQuestionOption>(e =>
+            {
+                e.HasIndex(o => new { o.SurveyQuestionId, o.Order })
+                 .HasDatabaseName("IX_SurveyQuestionOptions_QuestionId_Order");
+
+                // Foreign key to SurveyQuestion
+                e.HasOne(o => o.SurveyQuestion)
+                 .WithMany(q => q.Options)
+                 .HasForeignKey(o => o.SurveyQuestionId)
+                 .OnDelete(DeleteBehavior.Cascade);
             });
 
             // LeadLakes: filtered by UserId, Email
@@ -500,6 +517,8 @@ namespace ProcessZero.Domain
         public DbSet<SurveyRespondent> SurveyRespondents { get; set; }
 
         public DbSet<SurveyAnswer> SurveyAnswers { get; set; }
+
+        public DbSet<SurveyQuestionOption> SurveyQuestionOptions { get; set; }
 
 
         public DbSet<RelayEmailAccount> RelayEmailAccounts { get; set; }

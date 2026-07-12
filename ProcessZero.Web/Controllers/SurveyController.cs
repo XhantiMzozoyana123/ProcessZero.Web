@@ -28,7 +28,12 @@ using System.Text.Json;
  * - Category (enum)         : Contact | Business
  * - Type (enum)             : MultipleChoice | OpenEnded
  * - IsRequired (bool)       : whether the question must be answered
- * - OptionsJson (string?)   : JSON array of options (MultipleChoice only)
+ *
+ * SurveyQuestionOption (table: SurveyQuestionOptions)
+ * - Id (int)                : primary key (inherited from BaseEntity)
+ * - SurveyQuestionId (int)  : FK to SurveyQuestions.Id
+ * - Text (string)           : option text (one row per option for MultipleChoice)
+ * - Order (int)             : display order of the option
  *
  * SurveyRespondent (table: SurveyRespondents)
  * - Id (int)               : primary key (inherited from BaseEntity)
@@ -177,7 +182,8 @@ namespace ProcessZero.Web.Controllers
         /// POST api/survey  (or api/survey/s)
         /// Admin endpoint. Creates a new survey. Contact questions are added
         /// automatically as SurveyQuestion rows (Order 0-6); the supplied business
-        /// questions become rows 7+.
+        /// questions become rows 7+. Multiple-choice options are stored as
+        /// individual SurveyQuestionOption rows (no JSON).
         /// </summary>
         [Authorize(Policy = "Admin")]
         [HttpPost]
@@ -211,12 +217,21 @@ namespace ProcessZero.Web.Controllers
             {
                 return BadRequest("Malformed JSON in request body.");
             }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
+            {
+                return StatusCode(500, $"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal error: {ex.Message}");
+            }
         }
 
         /// <summary>
         /// PUT api/survey/{id}
         /// Admin endpoint. Updates an existing survey. All SurveyQuestion rows are
         /// replaced (contact questions re-prepended, business questions re-added).
+        /// Multiple-choice options are stored as individual SurveyQuestionOption rows.
         /// Existing SurveyAnswer rows are cascade-deleted with the questions.
         /// </summary>
         [Authorize(Policy = "Admin")]

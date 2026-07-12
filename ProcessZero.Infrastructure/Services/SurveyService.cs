@@ -48,7 +48,7 @@ namespace ProcessZero.Infrastructure.Services
 
         private string GetCurrentUserId()
         {
-            return _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            return _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "SYSTEM";
         }
 
         // ================== PUBLIC / RESPONDENT ENDPOINTS ==================
@@ -67,6 +67,7 @@ namespace ProcessZero.Infrastructure.Services
                 .AsNoTracking()
                 .Where(q => q.SurveyId == surveyId)
                 .OrderBy(q => q.Order)
+                .Include(q => q.Options)
                 .ToListAsync(cancellationToken);
 
             return new SurveyClientDto
@@ -260,7 +261,7 @@ namespace ProcessZero.Infrastructure.Services
             await _context.SaveChangesAsync(cancellationToken);
 
             // Add contact questions (order 0-6)
-            int order = 0;
+            int questionOrder = 0;
             foreach (var contact in BASE_CONTACT_QUESTIONS)
             {
                 _context.SurveyQuestions.Add(new SurveyQuestion
@@ -268,33 +269,48 @@ namespace ProcessZero.Infrastructure.Services
                     SurveyId = entity.Id,
                     UserId = userId,
                     Text = contact.Text,
-                    Order = order++,
+                    Order = questionOrder++,
                     Category = QuestionCategory.Contact,
                     IsRequired = contact.IsRequired,
                     Type = SurveyQuestionType.OpenEnded,
-                    OptionsJson = "[]",
                     CreatedAt = DateTime.UtcNow
                 });
             }
+            await _context.SaveChangesAsync(cancellationToken);
 
             // Add business questions (order 7+)
             foreach (var q in survey.Questions)
             {
-                _context.SurveyQuestions.Add(new SurveyQuestion
+                var question = new SurveyQuestion
                 {
                     SurveyId = entity.Id,
                     UserId = userId,
                     Text = q.Text,
-                    Order = order++,
+                    Order = questionOrder++,
                     Category = QuestionCategory.Business,
                     IsRequired = q.IsRequired,
                     Type = q.Type,
-                    OptionsJson = JsonSerializer.Serialize(q.Options ?? new List<string>()),
                     CreatedAt = DateTime.UtcNow
-                });
-            }
+                };
+                _context.SurveyQuestions.Add(question);
+                await _context.SaveChangesAsync(cancellationToken);
 
-            await _context.SaveChangesAsync(cancellationToken);
+                // Add individual option rows for MultipleChoice questions
+                if (q.Type == SurveyQuestionType.MultipleChoice && q.Options != null)
+                {
+                    foreach (var opt in q.Options.Select((text, idx) => new { text, idx }))
+                    {
+                        _context.SurveyQuestionOptions.Add(new SurveyQuestionOption
+                        {
+                            SurveyQuestionId = question.Id,
+                            Text = opt.text,
+                            Order = opt.idx,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+            }
 
             return await GetSurveyForAdminAsync(entity.Id, cancellationToken)
                 ?? throw new InvalidOperationException("Failed to retrieve created survey.");
@@ -326,7 +342,8 @@ namespace ProcessZero.Infrastructure.Services
             _context.SurveyQuestions.RemoveRange(existingQuestions);
             await _context.SaveChangesAsync(cancellationToken);
 
-            int order = 0;
+            // Add contact questions (order 0-6)
+            int questionOrder = 0;
             foreach (var contact in BASE_CONTACT_QUESTIONS)
             {
                 _context.SurveyQuestions.Add(new SurveyQuestion
@@ -334,32 +351,48 @@ namespace ProcessZero.Infrastructure.Services
                     SurveyId = entity.Id,
                     UserId = entity.UserId,
                     Text = contact.Text,
-                    Order = order++,
+                    Order = questionOrder++,
                     Category = QuestionCategory.Contact,
                     IsRequired = contact.IsRequired,
                     Type = SurveyQuestionType.OpenEnded,
-                    OptionsJson = "[]",
                     CreatedAt = DateTime.UtcNow
                 });
             }
+            await _context.SaveChangesAsync(cancellationToken);
 
+            // Add business questions (order 7+)
             foreach (var q in survey.Questions)
             {
-                _context.SurveyQuestions.Add(new SurveyQuestion
+                var question = new SurveyQuestion
                 {
                     SurveyId = entity.Id,
                     UserId = entity.UserId,
                     Text = q.Text,
-                    Order = order++,
+                    Order = questionOrder++,
                     Category = QuestionCategory.Business,
                     IsRequired = q.IsRequired,
                     Type = q.Type,
-                    OptionsJson = JsonSerializer.Serialize(q.Options ?? new List<string>()),
                     CreatedAt = DateTime.UtcNow
-                });
-            }
+                };
+                _context.SurveyQuestions.Add(question);
+                await _context.SaveChangesAsync(cancellationToken);
 
-            await _context.SaveChangesAsync(cancellationToken);
+                // Add individual option rows for MultipleChoice questions
+                if (q.Type == SurveyQuestionType.MultipleChoice && q.Options != null)
+                {
+                    foreach (var opt in q.Options.Select((text, idx) => new { text, idx }))
+                    {
+                        _context.SurveyQuestionOptions.Add(new SurveyQuestionOption
+                        {
+                            SurveyQuestionId = question.Id,
+                            Text = opt.text,
+                            Order = opt.idx,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+            }
 
             return await GetSurveyForAdminAsync(entity.Id, cancellationToken)
                 ?? throw new InvalidOperationException("Failed to retrieve updated survey.");
@@ -390,6 +423,7 @@ namespace ProcessZero.Infrastructure.Services
                 .AsNoTracking()
                 .Where(q => q.SurveyId == surveyId)
                 .OrderBy(q => q.Order)
+                .Include(q => q.Options)
                 .ToListAsync(cancellationToken);
 
             return new SurveyDto
@@ -521,12 +555,8 @@ namespace ProcessZero.Infrastructure.Services
 
         private SurveyQuestionDto MapToQuestionDto(SurveyQuestion q)
         {
-            List<string>? options = null;
-            if (q.Type == SurveyQuestionType.MultipleChoice && !string.IsNullOrWhiteSpace(q.OptionsJson))
-            {
-                try { options = JsonSerializer.Deserialize<List<string>>(q.OptionsJson); }
-                catch { options = new List<string>(); }
-            }
+            // Options are loaded separately via Include in queries
+            List<string> options = q.Options?.OrderBy(opt => opt.Order).Select(opt => opt.Text).ToList() ?? new List<string>();
             return new SurveyQuestionDto
             {
                 Id = q.Id,
@@ -534,7 +564,7 @@ namespace ProcessZero.Infrastructure.Services
                 IsRequired = q.IsRequired,
                 Category = q.Category,
                 Type = q.Type,
-                Options = options ?? new List<string>()
+                Options = options
             };
         }
 

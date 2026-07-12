@@ -12,8 +12,8 @@ using ProcessZero.Domain;
 namespace ProcessZero.Domain.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260704232112_RemoveUnusedResearchEntities")]
-    partial class RemoveUnusedResearchEntities
+    [Migration("20260712093329_CreateSurveySystem")]
+    partial class CreateSurveySystem
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -182,8 +182,16 @@ namespace ProcessZero.Domain.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<string>("FirstName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
                     b.Property<bool>("IsBanned")
                         .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("LastName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("tinyint(1)");
@@ -1468,7 +1476,195 @@ namespace ProcessZero.Domain.Migrations
                     b.ToTable("RelaySequenceSteps");
                 });
 
-            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestion", b =>
+            modelBuilder.Entity("ProcessZero.Domain.Entities.ScheduledEmailMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("RecipientName")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ScheduledEmailMessages");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.ScheduledFacebookMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("RecipientId")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TwilioSid")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ScheduledFacebookMessages");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.ScheduledSmsMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TwilioSid")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ScheduledSmsMessages");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.ScheduledWhatsAppMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("PhoneNumber")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("SentAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TwilioSid")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ScheduledWhatsAppMessages");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.Survey", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1483,9 +1679,17 @@ namespace ProcessZero.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("QuestionsJson")
+                    b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasDefaultValue("Active");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1505,11 +1709,142 @@ namespace ProcessZero.Domain.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_Surveys_Status");
+
                     b.HasIndex("UploadedAt")
                         .IsDescending()
-                        .HasDatabaseName("IX_SurveyQuestions_UploadedAt");
+                        .HasDatabaseName("IX_Surveys_UploadedAt");
+
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("IX_Surveys_UserId_Status");
+
+                    b.ToTable("Surveys");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyAnswer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AnswerText")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("SurveyQuestionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SurveyResponseId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SurveyQuestionId");
+
+                    b.HasIndex("SurveyResponseId", "SurveyQuestionId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SurveyAnswers_ResponseId_QuestionId");
+
+                    b.ToTable("SurveyAnswers");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Category")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SurveyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("varchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SurveyId", "Order")
+                        .HasDatabaseName("IX_SurveyQuestions_SurveyId_Order");
 
                     b.ToTable("SurveyQuestions");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestionOption", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SurveyQuestionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("varchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SurveyQuestionId", "Order")
+                        .HasDatabaseName("IX_SurveyQuestionOptions_QuestionId_Order");
+
+                    b.ToTable("SurveyQuestionOptions");
                 });
 
             modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyRespondent", b =>
@@ -1558,6 +1893,9 @@ namespace ProcessZero.Domain.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<int>("SurveyId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");
 
@@ -1568,11 +1906,15 @@ namespace ProcessZero.Domain.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Email")
-                        .HasDatabaseName("IX_SurveyRespondents_Email");
+                    b.HasIndex("SurveyId")
+                        .HasDatabaseName("IX_SurveyRespondents_SurveyId");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("IX_SurveyRespondents_UserId");
+
+                    b.HasIndex("SurveyId", "Email")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SurveyRespondents_SurveyId_Email");
 
                     b.ToTable("SurveyRespondents");
                 });
@@ -1585,14 +1927,14 @@ namespace ProcessZero.Domain.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AnswersJson")
-                        .HasColumnType("longtext");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<DateTime>("SubmittedAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<int>("SurveyId")
+                        .HasColumnType("int");
 
                     b.Property<int>("SurveyRespondentId")
                         .HasColumnType("int");
@@ -1606,6 +1948,13 @@ namespace ProcessZero.Domain.Migrations
                         .HasColumnType("varchar(450)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SurveyId")
+                        .HasDatabaseName("IX_SurveyResponses_SurveyId");
+
+                    b.HasIndex("SurveyId", "SubmittedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_SurveyResponses_SurveyId_SubmittedAt");
 
                     b.HasIndex("SurveyRespondentId", "SubmittedAt")
                         .IsDescending(false, true)
@@ -1835,15 +2184,75 @@ namespace ProcessZero.Domain.Migrations
                     b.Navigation("RelaySequence");
                 });
 
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyAnswer", b =>
+                {
+                    b.HasOne("ProcessZero.Domain.Entities.SurveyQuestion", "SurveyQuestion")
+                        .WithMany()
+                        .HasForeignKey("SurveyQuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ProcessZero.Domain.Entities.SurveyResponse", "SurveyResponse")
+                        .WithMany("Answers")
+                        .HasForeignKey("SurveyResponseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SurveyQuestion");
+
+                    b.Navigation("SurveyResponse");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestion", b =>
+                {
+                    b.HasOne("ProcessZero.Domain.Entities.Survey", "Survey")
+                        .WithMany("Questions")
+                        .HasForeignKey("SurveyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Survey");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestionOption", b =>
+                {
+                    b.HasOne("ProcessZero.Domain.Entities.SurveyQuestion", "SurveyQuestion")
+                        .WithMany("Options")
+                        .HasForeignKey("SurveyQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SurveyQuestion");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyRespondent", b =>
+                {
+                    b.HasOne("ProcessZero.Domain.Entities.Survey", "Survey")
+                        .WithMany("Respondents")
+                        .HasForeignKey("SurveyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Survey");
+                });
+
             modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyResponse", b =>
                 {
+                    b.HasOne("ProcessZero.Domain.Entities.Survey", "Survey")
+                        .WithMany("Responses")
+                        .HasForeignKey("SurveyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("ProcessZero.Domain.Entities.SurveyRespondent", "Respondent")
-                        .WithMany()
+                        .WithMany("Responses")
                         .HasForeignKey("SurveyRespondentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Respondent");
+
+                    b.Navigation("Survey");
                 });
 
             modelBuilder.Entity("ProcessZero.Domain.Entities.RelayCampaign", b =>
@@ -1882,6 +2291,30 @@ namespace ProcessZero.Domain.Migrations
             modelBuilder.Entity("ProcessZero.Domain.Entities.RelaySequenceStep", b =>
                 {
                     b.Navigation("Variants");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.Survey", b =>
+                {
+                    b.Navigation("Questions");
+
+                    b.Navigation("Respondents");
+
+                    b.Navigation("Responses");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyQuestion", b =>
+                {
+                    b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyRespondent", b =>
+                {
+                    b.Navigation("Responses");
+                });
+
+            modelBuilder.Entity("ProcessZero.Domain.Entities.SurveyResponse", b =>
+                {
+                    b.Navigation("Answers");
                 });
 #pragma warning restore 612, 618
         }
