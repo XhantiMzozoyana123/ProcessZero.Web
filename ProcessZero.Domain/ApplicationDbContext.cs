@@ -482,6 +482,24 @@ namespace ProcessZero.Domain
                 e.HasIndex(x => x.EmailAddress).IsUnique();
                 e.HasIndex(x => new { x.IsActive, x.SentToday });
             });
+
+            // ──────────────────────────────────────────────────────────
+            // MESSENGER SYSTEM
+            // ──────────────────────────────────────────────────────────
+
+            modelBuilder.Entity<Conversation>(e =>
+            {
+                e.HasIndex(c => c.UserOneId).HasDatabaseName("IX_Conversations_UserOneId");
+                e.HasIndex(c => c.UserTwoId).HasDatabaseName("IX_Conversations_UserTwoId");
+                e.HasIndex(c => c.LastMessageAt).HasDatabaseName("IX_Conversations_LastMessageAt");
+            });
+
+            modelBuilder.Entity<Message>(e =>
+            {
+                e.HasIndex(m => m.ConversationId).HasDatabaseName("IX_Messages_ConversationId");
+                e.HasIndex(m => m.SenderId).HasDatabaseName("IX_Messages_SenderId");
+                e.HasIndex(m => m.SentAt).HasDatabaseName("IX_Messages_SentAt");
+            });
         }
 
         public DbSet<KPI> KPIs { get; set; }
@@ -536,6 +554,10 @@ namespace ProcessZero.Domain
         public DbSet<RelayCampaignLead> RelayCampaignLeads { get; set; }
         public DbSet<RelayLead> RelayLeads { get; set; }
         public DbSet<RelayEmailActivity> RelayEmailActivities { get; set; }
+
+        // MESSENGER SYSTEM
+        public DbSet<Conversation> Conversations { get; set; }
+        public DbSet<Message> Messages { get; set; }
 
         // SCHEDULER SYSTEM
         public DbSet<ScheduledSmsMessage> ScheduledSmsMessages { get; set; }

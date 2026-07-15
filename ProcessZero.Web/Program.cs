@@ -9,6 +9,7 @@ using ProcessZero.Application.Options;
 using ProcessZero.Domain;
 using ProcessZero.Infrastructure.BackgroundJobs;
 using ProcessZero.Infrastructure.Filters;
+using ProcessZero.Infrastructure.Hubs;
 using ProcessZero.Infrastructure.Services;
 using System.Security.Claims;
 using System.Text;
@@ -188,6 +189,16 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 
 // -----------------------------
+// SIGNALR (MESSENGER)
+// -----------------------------
+builder.Services.AddSignalR();
+
+// -----------------------------
+// MESSENGER SERVICES
+// -----------------------------
+builder.Services.AddScoped<IMessengerService, MessengerService>();
+
+// -----------------------------
 // APPLICATION SERVICES
 // -----------------------------
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -264,7 +275,7 @@ builder.Services.AddCors(options =>
          .AllowAnyMethod());
 });
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
@@ -273,12 +284,9 @@ var app = builder.Build();
 // -----------------------------
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler();
     app.UseHttpsRedirection();
 }
-
-app.UseDefaultFiles();
-app.UseStaticFiles();
 
 app.UseRouting();
 
@@ -316,9 +324,36 @@ app.MapGet("/whoami", () =>
     });
 });
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+// -----------------------------
+// SIGNALR MESSENGER HUB
+// -----------------------------
+// Real-time messaging endpoint for Angular frontend:
+// - REST API: /api/messenger/* (configured via MapControllers above)
+// - SignalR: /hubs/messenger (for live updates)
+// 
+// Angular SignalR client setup:
+// const connection = new HubConnectionBuilder()
+//   .withUrl('/hubs/messenger', { 
+//     accessTokenFactory: () => localStorage.getItem('jwt') 
+//   })
+//   .build();
+// 
+// Events to listen for:
+// - ReceiveMessage(conversationId, senderId, message)
+// - UserTyping(conversationId, userId)
+// - UserStoppedTyping(conversationId, userId)
+// - UserOnline(userId)
+// - UserOffline(userId)
+//
+// Methods to invoke:
+// - SendMessage(conversationId, message)
+// - JoinConversation(conversationId)
+// - LeaveConversation(conversationId)
+// - TypingIndicator(conversationId)
+// - StopTypingIndicator(conversationId)
+app.MapHub<MessengerHub>("/hubs/messenger");
+
+app.MapControllers();
 
 // -----------------------------
 // STARTUP INIT
