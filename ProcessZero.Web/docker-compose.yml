@@ -1,0 +1,52 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: processzero-web:latest
+    container_name: processzero-web
+    ports:
+      - "8081:8081"
+    env_file:
+      - ./.processzero.env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8081
+      # All app settings for the VPS are loaded from:
+      #   ./.processzero.env
+      # Create/update that file by running:
+      #   sudo bash setup-env-vars.sh
+
+    restart: unless-stopped
+    # Uncomment to use the local MySQL service below:
+    # depends_on:
+    #   db:
+    #     condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Optional local MySQL database. The app currently points at a remote DB in
+  # appsettings.json, so this is disabled by default. To use it:
+  #   1. Uncomment this whole "db" block.
+  #   2. Uncomment the depends_on block above.
+  # ---------------------------------------------------------------------------
+  # db:
+  #   image: mysql:8.0
+  #   container_name: processzero-db
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: rootpassword
+  #     MYSQL_DATABASE: processzero
+  #     MYSQL_USER: processzero
+  #     MYSQL_PASSWORD: processzero
+  #   ports:
+  #     - "3306:3306"
+  #   volumes:
+  #     - db_data:/var/lib/mysql
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+  #   restart: unless-stopped
+
+# volumes:
+#   db_data:
