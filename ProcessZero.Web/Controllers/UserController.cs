@@ -11,10 +11,12 @@ namespace ProcessZero.Web.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IAuthService _authService;
 
-        public UserController(IUserService userService)
+        public UserController(IUserService userService, IAuthService authService)
         {
             _userService = userService;
+            _authService = authService;
         }
 
         // GET: api/user
@@ -81,6 +83,19 @@ namespace ProcessZero.Web.Controllers
 
             var banned = await _userService.IsUserBannedAsync(id, cancellationToken);
             return Ok(new { id, isBanned = banned });
+        }
+
+        /// <summary>
+        /// Generates an impersonation token for the specified user. This allows an admin
+        /// to login as that user without knowing their password.
+        /// </summary>
+        [HttpPost("{id}/impersonate")]
+        public async Task<IActionResult> ImpersonateUser(string id, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return BadRequest("id is required");
+
+            var token = await _authService.GenerateImpersonationTokenAsync(id);
+            return Ok(new { token });
         }
     }
 

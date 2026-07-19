@@ -275,5 +275,18 @@ namespace ProcessZero.Infrastructure.Services
             var errors = string.Join(", ", result.Errors.Select(e => e.Description));
             throw new Exception(errors);
         }
+
+        public async Task<string> GenerateImpersonationTokenAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new ArgumentException("User id is required.", nameof(userId));
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new InvalidOperationException("User not found.");
+
+            var token = await GenerateJwtTokenAsync(user);
+            return token;
+        }
     }
 }
