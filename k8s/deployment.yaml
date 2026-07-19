@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processzero-web
+  labels:
+    app: processzero-web
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: processzero-web
+  template:
+    metadata:
+      labels:
+        app: processzero-web
+    spec:
+      containers:
+        - name: processzero-web
+          image: processzero-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+          # Load all environment variables from ConfigMap (non-sensitive config)
+          envFrom:
+            - configMapRef:
+                name: processzero-config
+            - secretRef:
+                name: processzero-secrets
+          env:
+            # Override with specific values if needed
+            - name: ENVIRONMENT_TYPE
+              value: "kubernetes"
+          # Adjust resources based on your cluster capacity
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3

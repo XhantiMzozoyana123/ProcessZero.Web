@@ -1,0 +1,41 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Node / Playwright local caches
+**/node_modules/
+.playwright/
+playwright-report/
+test-results/
+
+# OS files
+**/.DS_Store
+Thumbs.db
+
+# Docs (not needed in image)
+*.md
+DOCUMENTATION_INDEX.md
+
+# Scripts
+setup-playwright.bat
+setup-playwright.ps1
+verify-playwright.ps1

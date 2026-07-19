@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="ProcessZero.Application/ProcessZero.Application.csproj" Id="e53bd2e9-94d6-41a5-8900-89c693b4c87c" />
+  <Project Path="ProcessZero.Domain/ProcessZero.Domain.csproj" Id="b46f2b35-ba44-45e1-b173-152c3d29f01e" />
+  <Project Path="ProcessZero.Infrastructure/ProcessZero.Infrastructure.csproj" Id="91a08f1f-0413-4e8a-b6c9-625596259847" />
+  <Project Path="ProcessZero.Web.csproj" />
