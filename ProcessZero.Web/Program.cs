@@ -9,7 +9,6 @@ using ProcessZero.Application.Options;
 using ProcessZero.Domain;
 using ProcessZero.Infrastructure.BackgroundJobs;
 using ProcessZero.Infrastructure.Filters;
-using ProcessZero.Infrastructure.Hubs;
 using ProcessZero.Infrastructure.Services;
 using System.Security.Claims;
 using System.Text;
@@ -189,16 +188,6 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 
 // -----------------------------
-// SIGNALR (MESSENGER)
-// -----------------------------
-builder.Services.AddSignalR();
-
-// -----------------------------
-// MESSENGER SERVICES
-// -----------------------------
-builder.Services.AddScoped<IMessengerService, MessengerService>();
-
-// -----------------------------
 // APPLICATION SERVICES
 // -----------------------------
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -270,9 +259,18 @@ builder.Services.AddScoped<RelayCampaignBackgroundService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(p =>
-        p.AllowAnyOrigin()
+        p.WithOrigins(
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:8100",
+            "http://77.93.155.211",
+            "https://77.93.155.211",
+            "https://processzero.xyz",
+            "https://www.processzero.xyz"
+         )
          .AllowAnyHeader()
-         .AllowAnyMethod());
+         .AllowAnyMethod()
+         .AllowCredentials());
 });
 
 builder.Services.AddControllers();
@@ -312,6 +310,20 @@ RecurringJob.AddOrUpdate<ScheduledMessagesBackgroundJob>(
     Cron.MinuteInterval(1)); // Run every minute
 
 // -----------------------------
+// HEALTH CHECK / STATUS
+// -----------------------------
+app.MapGet("/", () =>
+{
+    return Results.Ok(new
+    {
+        name = "ProcessZero API",
+        status = "running",
+        time = DateTime.UtcNow,
+        docs = "/swagger"
+    });
+});
+
+// -----------------------------
 // KUBERNETES ROUND-ROBIN TEST
 // -----------------------------
 app.MapGet("/whoami", () =>
@@ -323,35 +335,6 @@ app.MapGet("/whoami", () =>
         Time = DateTime.UtcNow
     });
 });
-
-// -----------------------------
-// SIGNALR MESSENGER HUB
-// -----------------------------
-// Real-time messaging endpoint for Angular frontend:
-// - REST API: /api/messenger/* (configured via MapControllers above)
-// - SignalR: /hubs/messenger (for live updates)
-// 
-// Angular SignalR client setup:
-// const connection = new HubConnectionBuilder()
-//   .withUrl('/hubs/messenger', { 
-//     accessTokenFactory: () => localStorage.getItem('jwt') 
-//   })
-//   .build();
-// 
-// Events to listen for:
-// - ReceiveMessage(conversationId, senderId, message)
-// - UserTyping(conversationId, userId)
-// - UserStoppedTyping(conversationId, userId)
-// - UserOnline(userId)
-// - UserOffline(userId)
-//
-// Methods to invoke:
-// - SendMessage(conversationId, message)
-// - JoinConversation(conversationId)
-// - LeaveConversation(conversationId)
-// - TypingIndicator(conversationId)
-// - StopTypingIndicator(conversationId)
-app.MapHub<MessengerHub>("/hubs/messenger");
 
 app.MapControllers();
 
