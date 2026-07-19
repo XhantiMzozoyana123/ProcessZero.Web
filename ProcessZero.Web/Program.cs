@@ -263,6 +263,8 @@ builder.Services.AddCors(options =>
             "http://localhost:3000",
             "http://localhost:5173",
             "http://localhost:8100",
+            "http://localhost:8101",
+            "http://localhost:8102",
             "http://77.93.155.211",
             "https://77.93.155.211",
             "https://processzero.xyz",
