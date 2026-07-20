@@ -432,6 +432,55 @@ namespace ProcessZero.Domain
                 e.HasIndex(x => x.EmailAddress).IsUnique();
                 e.HasIndex(x => new { x.IsActive, x.SentToday });
             });
+
+            // Credit System Configurations
+            modelBuilder.Entity<UserWallet>(e =>
+            {
+                e.Property(w => w.UserId).HasMaxLength(450);
+                e.Property(w => w.SubscriptionId).HasMaxLength(256);
+                e.Property(w => w.SubscriptionStatus).HasMaxLength(50);
+
+                e.HasIndex(w => w.UserId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_UserWallets_UserId");
+
+                e.HasOne(w => w.User)
+                    .WithMany()
+                    .HasForeignKey(w => w.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CreditTransaction>(e =>
+            {
+                e.Property(t => t.Description).HasMaxLength(500);
+                e.Property(t => t.ReferenceId).HasMaxLength(256);
+                e.Property(t => t.RelatedEntityType).HasMaxLength(100);
+
+                e.HasIndex(t => t.UserWalletId)
+                    .HasDatabaseName("IX_CreditTransactions_UserWalletId");
+                e.HasIndex(t => t.TransactionDate)
+                    .HasDatabaseName("IX_CreditTransactions_TransactionDate");
+                e.HasIndex(t => new { t.UserWalletId, t.TransactionDate })
+                    .HasDatabaseName("IX_CreditTransactions_UserWalletId_TransactionDate")
+                    .IsDescending(false, true);
+
+                e.HasOne(t => t.UserWallet)
+                    .WithMany()
+                    .HasForeignKey(t => t.UserWalletId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CreditPackage>(e =>
+            {
+                e.Property(p => p.Name).HasMaxLength(100);
+                e.Property(p => p.Description).HasMaxLength(500);
+                e.Property(p => p.Currency).HasMaxLength(3);
+
+                e.HasIndex(p => p.IsActive)
+                    .HasDatabaseName("IX_CreditPackages_IsActive");
+                e.HasIndex(p => p.SortOrder)
+                    .HasDatabaseName("IX_CreditPackages_SortOrder");
+            });
         }
 
         public DbSet<KPI> KPIs { get; set; }
@@ -467,5 +516,10 @@ namespace ProcessZero.Domain
         public DbSet<ScheduledWhatsAppMessage> ScheduledWhatsAppMessages { get; set; }
         public DbSet<ScheduledFacebookMessage> ScheduledFacebookMessages { get; set; }
         public DbSet<ScheduledEmailMessage> ScheduledEmailMessages { get; set; }
+
+        // Credit System Entities
+        public DbSet<UserWallet> UserWallets { get; set; }
+        public DbSet<CreditTransaction> CreditTransactions { get; set; }
+        public DbSet<CreditPackage> CreditPackages { get; set; }
     }
 }

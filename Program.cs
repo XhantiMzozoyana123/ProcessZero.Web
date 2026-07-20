@@ -207,6 +207,7 @@ builder.Services.AddScoped<IBlasterService, BlasterService>();
 builder.Services.AddScoped<ScheduledMessagesBackgroundJob>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserWalletService, UserWalletService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ISurveyService, SurveyService>();
 builder.Services.AddScoped<IInboxService, InboxService>();
