@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- Disable static web assets since this is an API-only project with no wwwroot directory -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,6 +25,13 @@
     <ProjectReference Include="ProcessZero.Application\ProcessZero.Application.csproj" />
     <ProjectReference Include="ProcessZero.Domain\ProcessZero.Domain.csproj" />
     <ProjectReference Include="ProcessZero.Infrastructure\ProcessZero.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Exclude obj folders from compilation to avoid duplicate assembly attribute errors with .NET 10 SDK -->
+  <ItemGroup>
+    <Compile Remove="ProcessZero.Domain\obj\**\*.cs" />
+    <Compile Remove="ProcessZero.Infrastructure\obj\**\*.cs" />
+    <Compile Remove="ProcessZero.Application\obj\**\*.cs" />
   </ItemGroup>
 
 </Project>

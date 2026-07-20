@@ -1,10 +1,7 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using ProcessZero.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace ProcessZero.Domain
 {
@@ -41,8 +38,6 @@ namespace ProcessZero.Domain
             builder.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 36)));
 
             return builder.Options;
-
-
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -55,14 +50,12 @@ namespace ProcessZero.Domain
             // Column length constraints (required for indexing nvarchar)
             // ──────────────────────────────────────────────────────────
 
-            // Contacts — constrain UserId & Email so they can be indexed
             modelBuilder.Entity<Contact>(e =>
             {
                 e.Property(c => c.UserId).HasMaxLength(450);
                 e.Property(c => c.Email).HasMaxLength(256);
             });
 
-            // Invoices — constrain UserId, InvoiceCode, CustomerCode
             modelBuilder.Entity<Invoice>(e =>
             {
                 e.Property(i => i.UserId).HasMaxLength(450);
@@ -71,7 +64,6 @@ namespace ProcessZero.Domain
                 e.Property(i => i.ExternalInvoiceId).HasMaxLength(256);
             });
 
-            // KPIs — constrain UserId & PolicyName
             modelBuilder.Entity<KPI>(e =>
             {
                 e.Property(k => k.UserId).HasMaxLength(450);
@@ -83,44 +75,37 @@ namespace ProcessZero.Domain
                 e.Property(k => k.PolicyName).HasMaxLength(100);
             });
 
-            // LeadLakes — constrain UserId & Email
             modelBuilder.Entity<LeadLake>(e =>
             {
                 e.Property(l => l.UserId).HasMaxLength(450);
                 e.Property(l => l.Email).HasMaxLength(256);
             });
 
-            // Meetings — UserId
             modelBuilder.Entity<Meeting>(e => 
             {
                 e.Property(m => m.UserId).HasMaxLength(450);
             });
 
-            // BankAccounts — UserId
             modelBuilder.Entity<BankAccount>(e =>
             {
                 e.Property(b => b.UserId).HasMaxLength(450);
             });
 
-            // Payouts — UserId
             modelBuilder.Entity<Payout>(e =>
             {
                 e.Property(p => p.UserId).HasMaxLength(450);
             });
 
-            // Assessments — UserId
             modelBuilder.Entity<Assessment>(e =>
             {
                 e.Property(a => a.UserId).HasMaxLength(450);
             });
 
-            // AssessmentSubmissions — UserId
             modelBuilder.Entity<AssessmentSubmission>(e =>
             {
                 e.Property(s => s.UserId).HasMaxLength(450);
             });
 
-            // Survey — UserId is optional to support system/admin operations
             modelBuilder.Entity<Survey>(e =>
             {
                 e.Property(r => r.UserId).HasMaxLength(450);
@@ -163,24 +148,17 @@ namespace ProcessZero.Domain
                 e.Property(r => r.AnswerText).HasMaxLength(2000);
             });
 
-
-            // Inboxes — UserId
             modelBuilder.Entity<Inbox>(e =>
             {
                 e.Property(i => i.UserId).HasMaxLength(450);
             });
 
-            // Products — UserId
             modelBuilder.Entity<Product>(e =>
             {
                 e.Property(p => p.UserId).HasMaxLength(450);
             });
 
-            // ──────────────────────────────────────────────────────────
             // Performance indexes
-            // ──────────────────────────────────────────────────────────
-
-            // Contacts: filtered by UserId, Status, Email
             modelBuilder.Entity<Contact>(e =>
             {
                 e.HasIndex(c => c.UserId).HasDatabaseName("IX_Contacts_UserId");
@@ -189,7 +167,6 @@ namespace ProcessZero.Domain
                 e.HasIndex(c => new { c.UserId, c.Status }).HasDatabaseName("IX_Contacts_UserId_Status");
             });
 
-            // Invoices: filtered by UserId, ClientId, ProductId
             modelBuilder.Entity<Invoice>(e =>
             {
                 e.HasIndex(i => i.UserId).HasDatabaseName("IX_Invoices_UserId");
@@ -197,7 +174,6 @@ namespace ProcessZero.Domain
                 e.HasIndex(i => i.ProductId).HasDatabaseName("IX_Invoices_ProductId");
             });
 
-            // KPIs: always queried by UserId + ProductId, latest first
             modelBuilder.Entity<KPI>(e =>
             {
                 e.HasIndex(k => new { k.UserId, k.ProductId, k.CreatedAt })
@@ -209,7 +185,6 @@ namespace ProcessZero.Domain
                  .IsDescending(false, true);
             });
 
-            // Assessments: latest per ProductId
             modelBuilder.Entity<Assessment>(e =>
             {
                 e.HasIndex(a => new { a.ProductId, a.UploadedAt })
@@ -217,7 +192,6 @@ namespace ProcessZero.Domain
                  .IsDescending(false, true);
             });
 
-            // AssessmentSubmissions: latest per UserId + ProductId
             modelBuilder.Entity<AssessmentSubmission>(e =>
             {
                 e.HasIndex(s => new { s.UserId, s.ProductId, s.SubmittedAt })
@@ -225,7 +199,6 @@ namespace ProcessZero.Domain
                  .IsDescending(false, false, true);
             });
 
-            // Survey: multiple independent surveys with their own responses and respondents
             modelBuilder.Entity<Survey>(e =>
             {
                 e.HasIndex(r => r.Status).HasDatabaseName("IX_Surveys_Status");
@@ -241,7 +214,6 @@ namespace ProcessZero.Domain
                 e.HasIndex(r => new { r.SurveyId, r.Order })
                  .HasDatabaseName("IX_SurveyQuestions_SurveyId_Order");
 
-                // Foreign key to Survey
                 e.HasOne(r => r.Survey)
                  .WithMany(s => s.Questions)
                  .HasForeignKey(r => r.SurveyId)
@@ -251,13 +223,11 @@ namespace ProcessZero.Domain
             modelBuilder.Entity<SurveyRespondent>(e =>
             {
                 e.HasIndex(r => r.UserId).HasDatabaseName("IX_SurveyRespondents_UserId");
-                // Composite unique index: same email can exist in different surveys
                 e.HasIndex(r => new { r.SurveyId, r.Email })
                  .HasDatabaseName("IX_SurveyRespondents_SurveyId_Email")
                  .IsUnique();
                 e.HasIndex(r => r.SurveyId).HasDatabaseName("IX_SurveyRespondents_SurveyId");
 
-                // Foreign key to Survey
                 e.HasOne(r => r.Survey)
                  .WithMany(s => s.Respondents)
                  .HasForeignKey(r => r.SurveyId)
@@ -274,13 +244,11 @@ namespace ProcessZero.Domain
                  .HasDatabaseName("IX_SurveyResponses_RespondentId_SubmittedAt")
                  .IsDescending(false, true);
 
-                // Foreign key to Survey
                 e.HasOne(r => r.Survey)
                  .WithMany(s => s.Responses)
                  .HasForeignKey(r => r.SurveyId)
                  .OnDelete(DeleteBehavior.Cascade);
 
-                // Foreign key to Respondent
                 e.HasOne(r => r.Respondent)
                  .WithMany(s => s.Responses)
                  .HasForeignKey(r => r.SurveyRespondentId)
@@ -293,13 +261,11 @@ namespace ProcessZero.Domain
                  .HasDatabaseName("IX_SurveyAnswers_ResponseId_QuestionId")
                  .IsUnique();
 
-                // Foreign key to SurveyResponse
                 e.HasOne(r => r.SurveyResponse)
                  .WithMany(sr => sr.Answers)
                  .HasForeignKey(r => r.SurveyResponseId)
                  .OnDelete(DeleteBehavior.Cascade);
 
-                // Foreign key to SurveyQuestion
                 e.HasOne(r => r.SurveyQuestion)
                  .WithMany()
                  .HasForeignKey(r => r.SurveyQuestionId)
@@ -311,14 +277,12 @@ namespace ProcessZero.Domain
                 e.HasIndex(o => new { o.SurveyQuestionId, o.Order })
                  .HasDatabaseName("IX_SurveyQuestionOptions_QuestionId_Order");
 
-                // Foreign key to SurveyQuestion
                 e.HasOne(o => o.SurveyQuestion)
                  .WithMany(q => q.Options)
                  .HasForeignKey(o => o.SurveyQuestionId)
                  .OnDelete(DeleteBehavior.Cascade);
             });
 
-            // LeadLakes: filtered by UserId, Email
             modelBuilder.Entity<LeadLake>(e =>
             {
                 e.HasIndex(l => l.UserId).HasDatabaseName("IX_LeadLakes_UserId");
@@ -326,7 +290,6 @@ namespace ProcessZero.Domain
                 e.HasIndex(l => new { l.UserId, l.Email }).HasDatabaseName("IX_LeadLakes_UserId_Email");
             });
 
-            // Meetings: filtered by UserId
             modelBuilder.Entity<Meeting>(e =>
             {
                 e.HasIndex(m => m.UserId).HasDatabaseName("IX_Meetings_UserId");
@@ -334,7 +297,6 @@ namespace ProcessZero.Domain
                 e.HasIndex(m => m.ProductId).HasDatabaseName("IX_Meetings_ProductId");
             });
 
-            // BankAccounts: one per user, queried by UserId
             modelBuilder.Entity<BankAccount>(e =>
             {
                 e.HasIndex(b => b.UserId)
@@ -342,14 +304,12 @@ namespace ProcessZero.Domain
                  .HasDatabaseName("IX_BankAccounts_UserId");
             });
 
-            // Payouts: filtered by UserId
             modelBuilder.Entity<Payout>(e =>
             {
                 e.HasIndex(p => p.UserId).HasDatabaseName("IX_Payouts_UserId");
                 e.HasIndex(p => new { p.UserId, p.Month, p.Year }).HasDatabaseName("IX_Payouts_UserId_Month_Year");
             });
 
-            // KpiPolicies: filtered by ProductId, IsActive
             modelBuilder.Entity<KpiPolicy>(e =>
             {
                 e.HasIndex(k => k.ProductId).HasDatabaseName("IX_KpiPolicies_ProductId");
@@ -357,17 +317,12 @@ namespace ProcessZero.Domain
                 e.HasIndex(k => k.EffectiveFrom).HasDatabaseName("IX_KpiPolicies_EffectiveFrom");
             });
 
-            // ApplicationUser: ban check on every request
             modelBuilder.Entity<ApplicationUser>(e =>
             {
                 e.HasIndex(u => u.IsBanned).HasDatabaseName("IX_AspNetUsers_IsBanned");
             });
 
-
-            // ──────────────────────────────────────────────────────────
             // RELAY EMAIL SYSTEM
-            // ──────────────────────────────────────────────────────────
-
             modelBuilder.Entity<RelayCampaign>(e =>
             {
                 e.HasIndex(x => x.IsActive);
@@ -446,11 +401,6 @@ namespace ProcessZero.Domain
                 e.HasIndex(x => x.EmailVariantId);
                 e.HasIndex(x => x.RelayCampaignId);
 
-                // Break multiple cascade paths: RelayEmailActivity is reachable
-                // from RelayCampaign both directly and via
-                // RelayEmailVariant -> SequenceStep -> Sequence -> Campaign.
-                // Use Restrict (NO ACTION) on these FKs to avoid SQL Server
-                // "may cause cycles or multiple cascade paths" error.
                 e.HasOne(x => x.RelayCampaign)
                     .WithMany()
                     .HasForeignKey(x => x.RelayCampaignId)
@@ -482,53 +432,29 @@ namespace ProcessZero.Domain
                 e.HasIndex(x => x.EmailAddress).IsUnique();
                 e.HasIndex(x => new { x.IsActive, x.SentToday });
             });
-
         }
 
         public DbSet<KPI> KPIs { get; set; }
-
         public DbSet<KpiPolicy> KpiPolicies { get; set; }
-
         public DbSet<Contact> Contacts { get; set; }
-
         public DbSet<LeadLake> LeadLakes { get; set; }
-
         public DbSet<Meeting> Meetings { get; set; }
-
         public DbSet<Product> Products { get; set; }
-
         public DbSet<Invoice> Invoices { get; set; }
-
         public DbSet<BankAccount> BankAccounts { get; set; }
-
         public DbSet<Payout> Payouts { get; set; }
-
         public DbSet<Inbox> Inboxes { get; set; }
-
         public DbSet<AssessmentSubmission> AssessmentSubmissions { get; set; }
-
         public DbSet<Assessment> Assessments { get; set; }
-
         public DbSet<Survey> Surveys { get; set; }
-
         public DbSet<SurveyQuestion> SurveyQuestions { get; set; }
-
         public DbSet<SurveyResponse> SurveyResponses { get; set; }
-
         public DbSet<SurveyRespondent> SurveyRespondents { get; set; }
-
         public DbSet<SurveyAnswer> SurveyAnswers { get; set; }
-
         public DbSet<SurveyQuestionOption> SurveyQuestionOptions { get; set; }
-
-
         public DbSet<RelayEmailAccount> RelayEmailAccounts { get; set; }
-
         public DbSet<RelayEmailReply> RelayEmailReplies { get; set; }
-
         public DbSet<Webinar> Webinars { get; set; }
-
-        // RELAY SYSTEM
         public DbSet<RelayCampaign> RelayCampaigns { get; set; }
         public DbSet<RelaySequence> RelaySequences { get; set; }
         public DbSet<RelaySequenceStep> RelaySequenceSteps { get; set; }
@@ -537,8 +463,6 @@ namespace ProcessZero.Domain
         public DbSet<RelayCampaignLead> RelayCampaignLeads { get; set; }
         public DbSet<RelayLead> RelayLeads { get; set; }
         public DbSet<RelayEmailActivity> RelayEmailActivities { get; set; }
-
-        // SCHEDULER SYSTEM
         public DbSet<ScheduledSmsMessage> ScheduledSmsMessages { get; set; }
         public DbSet<ScheduledWhatsAppMessage> ScheduledWhatsAppMessages { get; set; }
         public DbSet<ScheduledFacebookMessage> ScheduledFacebookMessages { get; set; }

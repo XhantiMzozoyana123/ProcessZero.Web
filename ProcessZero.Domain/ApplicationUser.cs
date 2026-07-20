@@ -1,11 +1,14 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Text;
 
 namespace ProcessZero.Domain
 {
+    /// <summary>
+    /// Application user entity extending ASP.NET Core Identity.
+    /// In Clean Architecture, this extends IdentityUser but contains
+    /// only domain-relevant properties.
+    /// </summary>
     public class ApplicationUser : IdentityUser
     {
         /// <summary>
