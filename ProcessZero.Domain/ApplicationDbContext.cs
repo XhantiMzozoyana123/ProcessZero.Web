@@ -452,6 +452,9 @@ namespace ProcessZero.Domain
 
             modelBuilder.Entity<CreditTransaction>(e =>
             {
+                // CreditTransaction is linked to a UserWallet (which has UserId), not directly to a user
+                e.Ignore(t => t.UserId);
+
                 e.Property(t => t.Description).HasMaxLength(500);
                 e.Property(t => t.ReferenceId).HasMaxLength(256);
                 e.Property(t => t.RelatedEntityType).HasMaxLength(100);
@@ -472,6 +475,9 @@ namespace ProcessZero.Domain
 
             modelBuilder.Entity<CreditPackage>(e =>
             {
+                // Credit packages are global, not user-specific
+                e.Ignore(p => p.UserId);
+
                 e.Property(p => p.Name).HasMaxLength(100);
                 e.Property(p => p.Description).HasMaxLength(500);
                 e.Property(p => p.Currency).HasMaxLength(3);

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using System.Security.Claims;
@@ -12,10 +13,14 @@ namespace ProcessZero.Web.Controllers
     public class CreditController : ControllerBase
     {
         private readonly IUserWalletService _walletService;
+        private readonly IConfiguration _configuration;
+        private readonly IPayPalService _payPalService;
 
-        public CreditController(IUserWalletService walletService)
+        public CreditController(IUserWalletService walletService, IConfiguration configuration, IPayPalService payPalService)
         {
             _walletService = walletService;
+            _configuration = configuration;
+            _payPalService = payPalService;
         }
 
         private string GetUserId() =>
@@ -144,6 +149,42 @@ namespace ProcessZero.Web.Controllers
             var wallet = await _walletService.GetUserWalletAsync(userId);
             
             return Ok(wallet);
+        }
+
+        [HttpPost("paypal/create")]
+        public async Task<IActionResult> CreatePayPalOrder([FromBody] CreatePayPalOrderRequest request)
+        {
+            var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            if (request == null || request.PackageId <= 0)
+                return BadRequest(new { message = "Invalid package." });
+
+            var packages = await _walletService.GetAvailablePackagesAsync();
+            var package = packages.FirstOrDefault(p => p.Id == request.PackageId);
+            if (package == null)
+                return NotFound(new { message = "Package not found." });
+
+            var webUrl = _configuration["PayPal:WebUrl"] ?? "https://processzero.xyz";
+            var returnUrl = $"{webUrl}/account/credits/wallet?paypal=success";
+            var cancelUrl = $"{webUrl}/account/credits/packages?paypal=cancelled";
+
+            var orderId = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl);
+
+            return Ok(new { orderId, packageId = package.Id });
+        }
+
+        [HttpPost("paypal/capture")]
+        public async Task<IActionResult> CapturePayPalOrder([FromBody] CapturePayPalOrderRequest request)
+        {
+            var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            if (string.IsNullOrWhiteSpace(request.OrderId))
+                return BadRequest(new { message = "Order ID is required." });
+
+            var captureJson = await _payPalService.CaptureOrderAsync(request.OrderId);
+            return Content(captureJson, "application/json");
         }
     }
 }

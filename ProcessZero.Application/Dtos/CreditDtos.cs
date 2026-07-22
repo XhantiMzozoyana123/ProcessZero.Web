@@ -114,6 +114,16 @@ namespace ProcessZero.Application.Dtos
         public bool IsSubscription { get; set; }
     }
 
+    public class CreatePayPalOrderRequest
+    {
+        public int PackageId { get; set; }
+    }
+
+    public class CapturePayPalOrderRequest
+    {
+        public string OrderId { get; set; } = string.Empty;
+    }
+
     /// <summary>
     /// DTO for credit balance check response
     /// </summary>
