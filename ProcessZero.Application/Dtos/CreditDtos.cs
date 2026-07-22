@@ -117,12 +117,15 @@ namespace ProcessZero.Application.Dtos
     public class CreatePayPalOrderRequest
     {
         public int PackageId { get; set; }
+        public string? ReturnUrl { get; set; }
+        public string? CancelUrl { get; set; }
     }
 
     public class CapturePayPalOrderRequest
     {
         public string OrderId { get; set; } = string.Empty;
         public int PackageId { get; set; }
+        public string? Authorization { get; set; }
     }
 
     /// <summary>

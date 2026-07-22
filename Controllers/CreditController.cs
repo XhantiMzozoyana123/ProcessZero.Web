@@ -166,8 +166,8 @@ namespace ProcessZero.Web.Controllers
                 return NotFound(new { message = "Package not found." });
 
             var webUrl = _configuration["PayPal:WebUrl"] ?? "https://processzero.xyz";
-            var returnUrl = $"{webUrl}/account/credits/wallet?paypal=success";
-            var cancelUrl = $"{webUrl}/account/credits/packages?paypal=cancelled";
+            var returnUrl = request.ReturnUrl ?? $"{webUrl}/account/credits/wallet?paypal=success";
+            var cancelUrl = request.CancelUrl ?? $"{webUrl}/account/credits/packages?paypal=cancelled";
 
             var (orderId, approvalUrl) = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl);
 
