@@ -51,9 +51,9 @@ namespace ProcessZero.Application.Interfaces
         Task<List<CreditTransactionDto>> GetTransactionHistoryAsync(string userId, int page = 1, int pageSize = 50, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Gets a specific transaction by ID.
+        /// Gets a specific transaction by ID (ensuring it belongs to the specified user).
         /// </summary>
-        Task<CreditTransactionDto?> GetTransactionByIdAsync(int transactionId, CancellationToken cancellationToken = default);
+        Task<CreditTransactionDto?> GetTransactionByIdAsync(string userId, int transactionId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Adjusts credits manually - admin only.

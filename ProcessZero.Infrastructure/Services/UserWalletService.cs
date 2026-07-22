@@ -291,24 +291,30 @@ namespace ProcessZero.Infrastructure.Services
             return transactions;
         }
 
-        public async Task<CreditTransactionDto?> GetTransactionByIdAsync(int transactionId, CancellationToken cancellationToken = default)
+public async Task<CreditTransactionDto?> GetTransactionByIdAsync(string userId, int transactionId, CancellationToken cancellationToken = default)
         {
             var transaction = await _context.CreditTransactions
                 .AsNoTracking()
-                .Select(t => new CreditTransactionDto
+                .Where(t => t.Id == transactionId)
+                .Join(_context.UserWallets,
+                    t => t.UserWalletId,
+                    w => w.Id,
+                    (t, w) => new { Transaction = t, Wallet = w })
+                .Where(x => x.Wallet.UserId == userId)
+                .Select(x => new CreditTransactionDto
                 {
-                    Id = t.Id,
-                    UserWalletId = t.UserWalletId,
-                    TransactionType = t.TransactionType.ToString(),
-                    CreditAmount = t.CreditAmount,
-                    BalanceAfterTransaction = t.BalanceAfterTransaction,
-                    Description = t.Description,
-                    ReferenceId = t.ReferenceId,
-                    RelatedEntityType = t.RelatedEntityType,
-                    RelatedEntityId = t.RelatedEntityId,
-                    TransactionDate = t.TransactionDate
+                    Id = x.Transaction.Id,
+                    UserWalletId = x.Transaction.UserWalletId,
+                    TransactionType = x.Transaction.TransactionType.ToString(),
+                    CreditAmount = x.Transaction.CreditAmount,
+                    BalanceAfterTransaction = x.Transaction.BalanceAfterTransaction,
+                    Description = x.Transaction.Description,
+                    ReferenceId = x.Transaction.ReferenceId,
+                    RelatedEntityType = x.Transaction.RelatedEntityType,
+                    RelatedEntityId = x.Transaction.RelatedEntityId,
+                    TransactionDate = x.Transaction.TransactionDate
                 })
-                .FirstOrDefaultAsync(t => t.Id == transactionId, cancellationToken);
+                .FirstOrDefaultAsync(cancellationToken);
 
             return transaction;
         }

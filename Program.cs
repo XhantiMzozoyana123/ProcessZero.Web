@@ -7,6 +7,7 @@ using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using ProcessZero.Application.Options;
 using ProcessZero.Domain;
+using ProcessZero.Domain.Entities;
 using ProcessZero.Infrastructure.BackgroundJobs;
 using ProcessZero.Infrastructure.Filters;
 using ProcessZero.Infrastructure.Services;
@@ -352,8 +353,10 @@ using (var scope = app.Services.CreateScope())
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+        var context = services.GetRequiredService<ApplicationDbContext>();
 
         await SeedAdminUser(userManager, roleManager);
+        await SeedCreditPackages(context);
 
         var scheduler = services.GetRequiredService<RelayCampaignBackgroundService>();
         scheduler.Start();
@@ -399,5 +402,76 @@ async Task SeedAdminUser(
     else if (!await userManager.IsInRoleAsync(user, "Admin"))
     {
         await userManager.AddToRoleAsync(user, "Admin");
+    }
+}
+
+// -----------------------------
+// SEED CREDIT PACKAGES
+// -----------------------------
+async Task SeedCreditPackages(ApplicationDbContext context)
+{
+    if (!await context.CreditPackages.AnyAsync())
+    {
+        var packages = new List<CreditPackage>
+        {
+            new CreditPackage
+            {
+                Name = "Starter Pack",
+                Description = "10 credits for new users to get started",
+                CreditAmount = 10,
+                Price = 9.99m,
+                Currency = "USD",
+                DurationMinutes = 60,
+                IsActive = true,
+                SortOrder = 1,
+                IsSubscription = false,
+                CreatedAt = DateTime.UtcNow
+            },
+            new CreditPackage
+            {
+                Name = "Pro Pack",
+                Description = "50 credits for active sales professionals",
+                CreditAmount = 50,
+                Price = 39.99m,
+                Currency = "USD",
+                DurationMinutes = 60,
+                IsActive = true,
+                SortOrder = 2,
+                DiscountPercentage = 20,
+                IsSubscription = false,
+                CreatedAt = DateTime.UtcNow
+            },
+            new CreditPackage
+            {
+                Name = "Enterprise Pack",
+                Description = "200 credits for high-volume users",
+                CreditAmount = 200,
+                Price = 149.99m,
+                Currency = "USD",
+                DurationMinutes = 60,
+                IsActive = true,
+                SortOrder = 3,
+                DiscountPercentage = 25,
+                IsSubscription = false,
+                CreatedAt = DateTime.UtcNow
+            },
+            new CreditPackage
+            {
+                Name = "Monthly Subscription",
+                Description = "30 credits every month, auto-renewing",
+                CreditAmount = 30,
+                Price = 24.99m,
+                Currency = "USD",
+                DurationMinutes = 60,
+                IsActive = true,
+                SortOrder = 4,
+                IsSubscription = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        context.CreditPackages.AddRange(packages);
+        await context.SaveChangesAsync();
+        Console.WriteLine("✅ Seeded initial credit packages");
     }
 }
