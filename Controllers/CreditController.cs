@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace ProcessZero.Web.Controllers
 {
@@ -15,12 +17,14 @@ namespace ProcessZero.Web.Controllers
         private readonly IUserWalletService _walletService;
         private readonly IConfiguration _configuration;
         private readonly IPayPalService _payPalService;
+        private readonly ILogger<CreditController> _logger;
 
-        public CreditController(IUserWalletService walletService, IConfiguration configuration, IPayPalService payPalService)
+        public CreditController(IUserWalletService walletService, IConfiguration configuration, IPayPalService payPalService, ILogger<CreditController> logger)
         {
             _walletService = walletService;
             _configuration = configuration;
             _payPalService = payPalService;
+            _logger = logger;
         }
 
         private string GetUserId() =>
@@ -152,7 +156,7 @@ namespace ProcessZero.Web.Controllers
         }
 
         [HttpPost("paypal/create")]
-        public async Task<IActionResult> CreatePayPalOrder([FromBody] CreatePayPalOrderRequest request)
+        public async Task<IActionResult> CreatePayPalOrder([FromBody] CreatePayPalOrderRequest request, CancellationToken cancellationToken)
         {
             var userId = GetUserId();
             if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
@@ -169,13 +173,13 @@ namespace ProcessZero.Web.Controllers
             var returnUrl = request.ReturnUrl ?? $"{webUrl}/account/credits/wallet?paypal=success";
             var cancelUrl = request.CancelUrl ?? $"{webUrl}/account/credits/packages?paypal=cancelled";
 
-            var (orderId, approvalUrl) = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl);
+            var (orderId, approvalUrl) = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl, cancellationToken);
 
             return Ok(new { orderId, approvalUrl, packageId = package.Id });
         }
 
         [HttpPost("paypal/capture")]
-        public async Task<IActionResult> CapturePayPalOrder([FromBody] CapturePayPalOrderRequest request)
+        public async Task<IActionResult> CapturePayPalOrder([FromBody] CapturePayPalOrderRequest request, CancellationToken cancellationToken)
         {
             var userId = GetUserId();
             if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
@@ -193,7 +197,34 @@ namespace ProcessZero.Web.Controllers
                 return NotFound(new { message = "Package not found." });
 
             // Capture the PayPal order
-            var captureJson = await _payPalService.CaptureOrderAsync(request.OrderId);
+            var captureJson = await _payPalService.CaptureOrderAsync(request.OrderId, cancellationToken);
+
+            // Verify the capture was successful before crediting the user's wallet
+            using var captureDoc = JsonDocument.Parse(captureJson);
+            var root = captureDoc.RootElement;
+
+            // Check the top-level order status
+            var orderStatus = root.GetProperty("status").GetString();
+            if (orderStatus != "COMPLETED")
+            {
+                _logger.LogWarning("PayPal capture for order {OrderId} was not completed. Order status: {Status}", request.OrderId, orderStatus);
+                return BadRequest(new { message = $"Payment was not completed. Status: {orderStatus}" });
+            }
+
+            // Also verify the individual capture status if available
+            if (root.TryGetProperty("purchase_units", out var purchaseUnits) &&
+                purchaseUnits.GetArrayLength() > 0 &&
+                purchaseUnits[0].TryGetProperty("payments", out var payments) &&
+                payments.TryGetProperty("captures", out var captures) &&
+                captures.GetArrayLength() > 0)
+            {
+                var captureStatus = captures[0].GetProperty("status").GetString();
+                if (captureStatus != "COMPLETED")
+                {
+                    _logger.LogWarning("PayPal capture for order {OrderId} was not completed. Capture status: {Status}", request.OrderId, captureStatus);
+                    return BadRequest(new { message = $"Payment was not completed. Status: {captureStatus}" });
+                }
+            }
 
             // Credit the user's wallet
             var purchaseResult = await _walletService.PurchaseCreditsAsync(userId, new PurchaseCreditsRequestDto
@@ -201,7 +232,7 @@ namespace ProcessZero.Web.Controllers
                 CreditPackageId = package.Id,
                 PaymentMethod = "PayPal",
                 PaymentReference = request.OrderId
-            });
+            }, cancellationToken);
 
             if (!purchaseResult.Success)
                 return BadRequest(purchaseResult);

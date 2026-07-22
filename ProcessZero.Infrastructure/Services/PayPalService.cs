@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -79,7 +80,7 @@ namespace ProcessZero.Infrastructure.Services
                         amount = new
                         {
                             currency_code = currency,
-                            value = amount.ToString("0.00")
+                            value = amount.ToString("0.00", CultureInfo.InvariantCulture)
                         }
                     }
                 },
@@ -106,14 +107,24 @@ namespace ProcessZero.Infrastructure.Services
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             using var doc = JsonDocument.Parse(json);
             var orderId = doc.RootElement.GetProperty("id").GetString() ?? string.Empty;
-            
-            // Extract approval URL from links
-            var approvalUrl = doc.RootElement
+
+            // Extract approval URL from links — safely handle missing "approve" link
+            var approveLink = doc.RootElement
                 .GetProperty("links")
                 .EnumerateArray()
-                .FirstOrDefault(link => link.GetProperty("rel").GetString() == "approve")
-                .GetProperty("href")
-                .GetString() ?? string.Empty;
+                .FirstOrDefault(link => link.GetProperty("rel").GetString() == "approve");
+
+            var approvalUrl = string.Empty;
+            if (approveLink.ValueKind != JsonValueKind.Undefined)
+            {
+                approvalUrl = approveLink.GetProperty("href").GetString() ?? string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(approvalUrl))
+            {
+                _logger.LogError("PayPal order {OrderId} created but no approval URL found in response: {Response}", orderId, json);
+                throw new InvalidOperationException("Failed to get PayPal approval URL.");
+            }
 
             return (orderId, approvalUrl);
         }
