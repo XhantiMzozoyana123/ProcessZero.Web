@@ -129,7 +129,8 @@ namespace ProcessZero.Infrastructure.Services
             var client = _httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-            var response = await client.PostAsync($"{baseUrl}/v2/checkout/orders/{orderId}/capture", null, cancellationToken);
+            var content = new StringContent("{}", Encoding.UTF8, "application/json");
+            var response = await client.PostAsync($"{baseUrl}/v2/checkout/orders/{orderId}/capture", content, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
