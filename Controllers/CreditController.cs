@@ -180,11 +180,40 @@ namespace ProcessZero.Web.Controllers
             var userId = GetUserId();
             if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
-            if (string.IsNullOrWhiteSpace(request.OrderId))
+            if (string.IsNullOrEmpty(request.OrderId))
                 return BadRequest(new { message = "Order ID is required." });
 
+            if (request.PackageId <= 0)
+                return BadRequest(new { message = "Invalid package." });
+
+            // Verify the package exists
+            var packages = await _walletService.GetAvailablePackagesAsync();
+            var package = packages.FirstOrDefault(p => p.Id == request.PackageId);
+            if (package == null)
+                return NotFound(new { message = "Package not found." });
+
+            // Capture the PayPal order
             var captureJson = await _payPalService.CaptureOrderAsync(request.OrderId);
-            return Content(captureJson, "application/json");
+
+            // Credit the user's wallet
+            var purchaseResult = await _walletService.PurchaseCreditsAsync(userId, new PurchaseCreditsRequestDto
+            {
+                CreditPackageId = package.Id,
+                PaymentMethod = "PayPal",
+                PaymentReference = request.OrderId
+            });
+
+            if (!purchaseResult.Success)
+                return BadRequest(purchaseResult);
+
+            // Return both capture details and credit result
+            var result = new
+            {
+                capture = captureJson,
+                credits = purchaseResult
+            };
+
+            return Ok(result);
         }
     }
 }

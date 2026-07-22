@@ -122,6 +122,7 @@ namespace ProcessZero.Application.Dtos
     public class CapturePayPalOrderRequest
     {
         public string OrderId { get; set; } = string.Empty;
+        public int PackageId { get; set; }
     }
 
     /// <summary>
