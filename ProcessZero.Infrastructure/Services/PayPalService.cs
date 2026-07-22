@@ -58,7 +58,7 @@ namespace ProcessZero.Infrastructure.Services
             return AccessToken;
         }
 
-        public async Task<string> CreateOrderAsync(decimal amount, string currency, string returnUrl, string cancelUrl, CancellationToken cancellationToken = default)
+        public async Task<(string OrderId, string ApprovalUrl)> CreateOrderAsync(decimal amount, string currency, string returnUrl, string cancelUrl, CancellationToken cancellationToken = default)
         {
             var environment = _configuration["PayPal:Environment"] ?? "Sandbox";
             var baseUrl = environment.Equals("Live", StringComparison.OrdinalIgnoreCase)
@@ -105,7 +105,17 @@ namespace ProcessZero.Infrastructure.Services
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.GetProperty("id").GetString() ?? string.Empty;
+            var orderId = doc.RootElement.GetProperty("id").GetString() ?? string.Empty;
+            
+            // Extract approval URL from links
+            var approvalUrl = doc.RootElement
+                .GetProperty("links")
+                .EnumerateArray()
+                .FirstOrDefault(link => link.GetProperty("rel").GetString() == "approve")
+                .GetProperty("href")
+                .GetString() ?? string.Empty;
+
+            return (orderId, approvalUrl);
         }
 
         public async Task<string> CaptureOrderAsync(string orderId, CancellationToken cancellationToken = default)

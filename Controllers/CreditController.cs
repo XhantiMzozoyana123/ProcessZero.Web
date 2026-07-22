@@ -169,9 +169,9 @@ namespace ProcessZero.Web.Controllers
             var returnUrl = $"{webUrl}/account/credits/wallet?paypal=success";
             var cancelUrl = $"{webUrl}/account/credits/packages?paypal=cancelled";
 
-            var orderId = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl);
+            var (orderId, approvalUrl) = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl);
 
-            return Ok(new { orderId, packageId = package.Id });
+            return Ok(new { orderId, approvalUrl, packageId = package.Id });
         }
 
         [HttpPost("paypal/capture")]
