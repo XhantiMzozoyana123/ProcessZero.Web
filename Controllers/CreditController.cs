@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
+using ProcessZero.Infrastructure.Filters;
+using ProcessZero.Infrastructure.Services;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -11,20 +13,21 @@ namespace ProcessZero.Web.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
     public class CreditController : ControllerBase
     {
         private readonly IUserWalletService _walletService;
         private readonly IConfiguration _configuration;
         private readonly IPayPalService _payPalService;
         private readonly ILogger<CreditController> _logger;
+        private readonly TimerServiceClient _timerService;
 
-        public CreditController(IUserWalletService walletService, IConfiguration configuration, IPayPalService payPalService, ILogger<CreditController> logger)
+        public CreditController(IUserWalletService walletService, IConfiguration configuration, IPayPalService payPalService, ILogger<CreditController> logger, TimerServiceClient timerService)
         {
             _walletService = walletService;
             _configuration = configuration;
             _payPalService = payPalService;
             _logger = logger;
+            _timerService = timerService;
         }
 
         private string GetUserId() =>
@@ -83,6 +86,8 @@ namespace ProcessZero.Web.Controllers
         }
 
         [HttpPost("consume")]
+        [Authorize]
+        [ServiceApiKeyAuth]  // Accepts either JWT or X-Timer-Api-Key header
         public async Task<IActionResult> ConsumeCredits([FromBody] ConsumeCreditsRequestDto request)
         {
             var userId = GetUserId();
@@ -99,6 +104,8 @@ namespace ProcessZero.Web.Controllers
         }
 
         [HttpPost("check")]
+        [Authorize]
+        [ServiceApiKeyAuth]  // Accepts either JWT or X-Timer-Api-Key header
         public async Task<IActionResult> CheckCreditBalance([FromBody] decimal requiredCredits)
         {
             var userId = GetUserId();
@@ -153,6 +160,39 @@ namespace ProcessZero.Web.Controllers
             var wallet = await _walletService.GetUserWalletAsync(userId);
             
             return Ok(wallet);
+        }
+
+        [HttpGet("remaining-hours")]
+        [Authorize]
+        [ServiceApiKeyAuth]  // Accepts either JWT or X-Timer-Api-Key header
+        public async Task<IActionResult> GetRemainingHours(CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            // Delegate to standalone ProcessZero.TimerService which tracks sessions independently
+            var result = await _timerService.GetRemainingHoursAsync(userId, cancellationToken);
+            if (result == null)
+            {
+                // Fallback to direct service
+                var remainingHours = await _walletService.GetRemainingHoursAsync(userId, cancellationToken);
+                return Ok(new { remainingHours });
+            }
+            return Ok(new { remainingHours = result.RemainingHours });
+        }
+
+        [HttpPost("consume-active-usage")]
+        public async Task<IActionResult> ConsumeActiveUsage([FromQuery] int minutes = 10, CancellationToken cancellationToken = default)
+        {
+            var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            var result = await _walletService.ConsumeActiveUsageAsync(userId, minutes, cancellationToken);
+
+            if (!result.Success)
+                return BadRequest(result);
+
+            return Ok(result);
         }
 
         [HttpPost("paypal/create")]
