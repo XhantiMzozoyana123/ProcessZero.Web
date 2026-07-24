@@ -39,3 +39,6 @@ DOCUMENTATION_INDEX.md
 setup-playwright.bat
 setup-playwright.ps1
 verify-playwright.ps1
+
+# Timer service (built separately via docker-compose)
+services/
