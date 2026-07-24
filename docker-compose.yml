@@ -8,7 +8,7 @@ services:
     ports:
       - "8081:8081"
     env_file:
-      - ./.processzero.env
+      - ./.env
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8081
@@ -22,19 +22,26 @@ services:
   # ── Standalone Timer Service ──
   # This service owns the countdown timer / session management logic.
   # It runs independently so that timers continue running during API deployments.
+  # The source code lives at ./services/timer-service so that the build context
+  # is self-contained within this repo (works on both dev machines and the VPS).
   timer-service:
     build:
-      context: ../../services/timer-service
+      context: ./services/timer-service
       dockerfile: Dockerfile
     image: processzero-timer:latest
     container_name: processzero-timer
     ports:
       - "8082:8082"
+    env_file:
+      - ./.env
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8082
       ConnectionStrings__DefaultConnection: "${CONNECTION_STRING}"
       TimerApiKey: "${TIMER_API_KEY}"
+      # In Docker Compose the timer service talks to the main API via the
+      # Docker service name "processzero-web" on port 8081.
+      MainApi__BaseUrl: http://processzero-web:8081
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
