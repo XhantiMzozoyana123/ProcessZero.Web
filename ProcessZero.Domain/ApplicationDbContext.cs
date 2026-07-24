@@ -527,5 +527,9 @@ namespace ProcessZero.Domain
         public DbSet<UserWallet> UserWallets { get; set; }
         public DbSet<CreditTransaction> CreditTransactions { get; set; }
         public DbSet<CreditPackage> CreditPackages { get; set; }
+
+        // Session tracking for credit consumption
+        public DbSet<UserSession> UserSessions { get; set; }
+        public DbSet<ConsumptionConfig> ConsumptionConfigs { get; set; }
     }
 }

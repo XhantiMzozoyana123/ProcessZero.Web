@@ -7,13 +7,18 @@
     <!-- Disable static web assets since this is an API-only project with no wwwroot directory -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- Disable default compile items so we can explicitly control which .cs files are compiled.
+         This prevents source files from referenced projects (ProcessZero.Domain,
+         ProcessZero.Infrastructure, ProcessZero.Application) in subdirectories from being
+         compiled directly into the Web project, which causes CS0436 type conflict warnings
+         when the same types are also available from the referenced assemblies. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13">
-
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
@@ -27,11 +32,12 @@
     <ProjectReference Include="ProcessZero.Infrastructure\ProcessZero.Infrastructure.csproj" />
   </ItemGroup>
 
-  <!-- Exclude referenced project source files from compilation to avoid duplicate type errors -->
+  <!-- Explicitly include only this project's own .cs files, excluding referenced project
+       source files and build artifacts. Using forward slashes ensures cross-platform
+       compatibility (critical for Docker/Linux builds). -->
   <ItemGroup>
-    <Compile Remove="ProcessZero.Domain\**\*.cs" />
-    <Compile Remove="ProcessZero.Infrastructure\**\*.cs" />
-    <Compile Remove="ProcessZero.Application\**\*.cs" />
+    <Compile Include="**/*.cs"
+             Exclude="bin/**;obj/**;ProcessZero.Domain/**/*.cs;ProcessZero.Infrastructure/**/*.cs;ProcessZero.Application/**/*.cs" />
   </ItemGroup>
 
 </Project>

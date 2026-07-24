@@ -64,5 +64,17 @@ namespace ProcessZero.Application.Interfaces
         /// Initializes wallet for a user if it doesn't exist.
         /// </summary>
         Task InitializeUserWalletAsync(string userId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Gets the remaining platform usage hours based on the user's credit balance.
+        /// Consumption rate: 0.2 credits per hour (1 credit = 5 hours).
+        /// </summary>
+        Task<decimal> GetRemainingHoursAsync(string userId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Consumes credits for active platform usage.
+        /// Consumption rate: 0.2 credits per hour.
+        /// </summary>
+        Task<CreditConsumeResponseDto> ConsumeActiveUsageAsync(string userId, int minutes = 10, CancellationToken cancellationToken = default);
     }
 }

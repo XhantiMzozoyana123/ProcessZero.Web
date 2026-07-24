@@ -184,6 +184,11 @@ builder.Services.Configure<GoogleOAuthOptions>(
 builder.Services.Configure<CalOptions>(
     builder.Configuration.GetSection("CalOptions"));
 
+// TimerService client: proxies session/timer calls to the standalone timer service
+builder.Services.Configure<TimerServiceOptions>(
+    builder.Configuration.GetSection(TimerServiceOptions.SectionName));
+builder.Services.AddHttpClient<TimerServiceClient>();
+
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
@@ -248,6 +253,8 @@ builder.Services.AddScoped<IImportStatusService, InMemoryImportStatusService>();
 builder.Services.AddScoped<IWebinarService, WebinarService>();
 builder.Services.AddScoped<ImportProcessor>();
 builder.Services.AddScoped<IExtractService, ExtractService>();
+// Consumption/session management is now handled by the standalone ProcessZero.TimerService
+// The TimerServiceClient proxies calls to it. No local consumption service is needed.
 
 // -----------------------------
 // BACKGROUND SERVICES
@@ -313,6 +320,10 @@ RecurringJob.AddOrUpdate<ScheduledMessagesBackgroundJob>(
     "process-scheduled-messages",
     job => job.ProcessScheduledMessagesAsync(),
     Cron.MinuteInterval(1)); // Run every minute
+
+// NOTE: Backend consumption timer has been moved to the standalone
+// ProcessZero.TimerService Docker container. It runs independently so
+// that timers don't reset during API deployments.
 
 // -----------------------------
 // HEALTH CHECK / STATUS

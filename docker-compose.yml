@@ -12,16 +12,30 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8081
-      # All app settings for the VPS are loaded from:
-      #   ./.processzero.env
-      # Create/update that file by running:
-      #   sudo bash setup-env-vars.sh
-
+      # Timer service URL - the timer service runs on port 8082
+      TimerService__BaseUrl: http://timer-service:8082
+      TimerService__ApiKey: "${TIMER_API_KEY}"
+    depends_on:
+      - timer-service
     restart: unless-stopped
-    # Uncomment to use the local MySQL service below:
-    # depends_on:
-    #   db:
-    #     condition: service_healthy
+
+  # ── Standalone Timer Service ──
+  # This service owns the countdown timer / session management logic.
+  # It runs independently so that timers continue running during API deployments.
+  timer-service:
+    build:
+      context: ../../services/timer-service
+      dockerfile: Dockerfile
+    image: processzero-timer:latest
+    container_name: processzero-timer
+    ports:
+      - "8082:8082"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8082
+      ConnectionStrings__DefaultConnection: "${CONNECTION_STRING}"
+      TimerApiKey: "${TIMER_API_KEY}"
+    restart: unless-stopped
 
   # ---------------------------------------------------------------------------
   # Optional local MySQL database. The app currently points at a remote DB in

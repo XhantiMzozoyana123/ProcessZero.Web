@@ -364,6 +364,38 @@ public async Task<CreditTransactionDto?> GetTransactionByIdAsync(string userId, 
             await GetOrCreateWalletAsync(userId, cancellationToken);
         }
 
+        /// <summary>
+        /// Gets the remaining platform usage hours based on the user's credit balance.
+        /// Consumption rate: 0.2 credits per hour (1 credit = 5 hours).
+        /// </summary>
+        public async Task<decimal> GetRemainingHoursAsync(string userId, CancellationToken cancellationToken = default)
+        {
+            var wallet = await _context.UserWallets
+                .AsNoTracking()
+                .FirstOrDefaultAsync(w => w.UserId == userId, cancellationToken);
+
+            var creditBalance = wallet?.CreditBalance ?? 0;
+            // 0.2 credits per hour = 1 credit per 5 hours
+            return creditBalance / 0.2m;
+        }
+
+        /// <summary>
+        /// Consumes credits for active platform usage.
+        /// Consumption rate: 0.2 credits per hour.
+        /// </summary>
+        public async Task<CreditConsumeResponseDto> ConsumeActiveUsageAsync(string userId, int minutes = 10, CancellationToken cancellationToken = default)
+        {
+            // 0.2 credits per hour = 0.2/60 credits per minute
+            var creditsToConsume = (decimal)minutes * 0.2m / 60m;
+
+            return await ConsumeCreditsAsync(userId, new ConsumeCreditsRequestDto
+            {
+                CreditAmount = creditsToConsume,
+                Description = $"Active usage for {minutes} minutes",
+                RelatedEntityType = "ActiveUsage"
+            }, cancellationToken);
+        }
+
         private async Task<UserWallet> GetOrCreateWalletAsync(string userId, CancellationToken cancellationToken)
         {
             var wallet = await _context.UserWallets
