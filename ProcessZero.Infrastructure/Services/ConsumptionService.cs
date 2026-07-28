@@ -16,16 +16,13 @@ namespace ProcessZero.Infrastructure.Services
     public class ConsumptionService : IConsumptionService
     {
         private readonly TimerServiceClient _timerClient;
-        private readonly IUserWalletService _walletService;
         private readonly ILogger<ConsumptionService> _logger;
 
         public ConsumptionService(
             TimerServiceClient timerClient,
-            IUserWalletService walletService,
             ILogger<ConsumptionService> logger)
         {
             _timerClient = timerClient ?? throw new ArgumentNullException(nameof(timerClient));
-            _walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -35,7 +32,7 @@ namespace ProcessZero.Infrastructure.Services
         {
             var result = await _timerClient.StartSessionAsync(userId, deviceInfo, cancellationToken);
             if (result != null) return MapToAppSessionDto(result);
-            
+
             _logger.LogWarning("TimerService unavailable for StartSession, returning default");
             return new UserSessionDto { UserId = userId, IsActive = false };
         }
@@ -44,7 +41,7 @@ namespace ProcessZero.Infrastructure.Services
         {
             var result = await _timerClient.EndSessionAsync(sessionId, userId, cancellationToken);
             if (result != null) return MapToAppHeartbeatDto(result);
-            
+
             return new SessionHeartbeatResponseDto { Success = false, Message = "Timer service unavailable" };
         }
 
@@ -52,7 +49,7 @@ namespace ProcessZero.Infrastructure.Services
         {
             var result = await _timerClient.HeartbeatAsync(sessionId, userId, cancellationToken);
             if (result != null) return MapToAppHeartbeatDto(result);
-            
+
             return new SessionHeartbeatResponseDto { Success = false, Message = "Timer service unavailable" };
         }
 
@@ -72,33 +69,128 @@ namespace ProcessZero.Infrastructure.Services
 
         public async Task<ConsumptionConfigDto> GetConfigAsync(CancellationToken cancellationToken = default)
         {
-            return new ConsumptionConfigDto { IsEnabled = true, CreditsPerHour = 0.2m, GracePeriodMinutes = 0, InitialFreeHours = 5 };
+            try
+            {
+                var result = await _timerClient.GetConfigAsync(cancellationToken);
+                if (result != null) return MapToAppConfigDto(result);
+
+                _logger.LogWarning("TimerService unavailable for GetConfig, returning default");
+                return DefaultConfig();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetConfigAsync");
+                return DefaultConfig();
+            }
         }
 
         public async Task<ConsumptionConfigDto> UpdateConfigAsync(UpdateConsumptionConfigDto dto, CancellationToken cancellationToken = default)
         {
-            _logger.LogInformation("Config updates are managed on the ProcessZero.TimerService dashboard");
-            return await GetConfigAsync(cancellationToken);
+            try
+            {
+                var timerDto = new TimerConfigDto
+                {
+                    CreditsPerHour = dto.CreditsPerHour,
+                    CheckIntervalMinutes = dto.CheckIntervalMinutes,
+                    MaxSessionMinutes = dto.MaxSessionMinutes,
+                    IsEnabled = dto.IsEnabled,
+                    GracePeriodMinutes = dto.GracePeriodMinutes,
+                    InitialFreeHours = dto.InitialFreeHours,
+                    EnforceAccessBlock = dto.EnforceAccessBlock
+                };
+
+                var result = await _timerClient.UpdateConfigAsync(timerDto, cancellationToken);
+                if (result != null) return MapToAppConfigDto(result);
+
+                _logger.LogWarning("TimerService unavailable for UpdateConfig, returning submitted config");
+                return ConfigFromDto(dto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in UpdateConfigAsync");
+                // Return safe default config when timer service is unavailable
+                return ConfigFromDto(dto);
+            }
+        }
+
+        public async Task<ConsumptionConfigDto> DeleteConfigAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _timerClient.DeleteConfigAsync(cancellationToken);
+                if (result != null) return MapToAppConfigDto(result);
+
+                _logger.LogWarning("TimerService unavailable for DeleteConfig, returning default");
+                return DefaultConfig();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in DeleteConfigAsync");
+                return DefaultConfig();
+            }
         }
 
         public async Task<List<UserSessionDto>> GetAllActiveSessionsAsync(CancellationToken cancellationToken = default)
         {
-            return new List<UserSessionDto>();
+            try
+            {
+                var result = await _timerClient.GetAllActiveSessionsAsync(cancellationToken);
+                if (result != null)
+                {
+                    var sessions = new List<UserSessionDto>();
+                    foreach (var s in result)
+                    {
+                        sessions.Add(MapToAppSessionDto(s));
+                    }
+                    return sessions;
+                }
+
+                _logger.LogWarning("TimerService unavailable for GetAllActiveSessions, returning empty list");
+                return new List<UserSessionDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetAllActiveSessionsAsync");
+                return new List<UserSessionDto>();
+            }
         }
 
         public async Task<bool> ForceEndSessionAsync(int sessionId, CancellationToken cancellationToken = default)
         {
-            _logger.LogWarning("Session management is handled by ProcessZero.TimerService");
-            return false;
+            try
+            {
+                var result = await _timerClient.ForceEndSessionAsync(sessionId, cancellationToken);
+                if (result) return true;
+
+                _logger.LogWarning("TimerService unavailable for ForceEndSession, returning false");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in ForceEndSessionAsync");
+                return false;
+            }
         }
 
         public async Task<ConsumptionStatsDto> GetStatsAsync(CancellationToken cancellationToken = default)
         {
-            return new ConsumptionStatsDto();
+            try
+            {
+                var result = await _timerClient.GetStatsAsync(cancellationToken);
+                if (result != null) return MapToAppStatsDto(result);
+
+                _logger.LogWarning("TimerService unavailable for GetStats, returning default");
+                return new ConsumptionStatsDto();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetStatsAsync");
+                return new ConsumptionStatsDto();
+            }
         }
 
         /// <summary>
-        /// This is no longer run locally - it runs in the standalone timer service.
+        /// This is no longer run locally - it runs in the standalone ProcessZero.TimerService.
         /// </summary>
         public async Task<int> ProcessActiveSessionsAsync(CancellationToken cancellationToken = default)
         {
@@ -107,6 +199,38 @@ namespace ProcessZero.Infrastructure.Services
         }
 
         // ── Mapping Helpers ──
+
+        private static ConsumptionConfigDto DefaultConfig()
+        {
+            return new ConsumptionConfigDto
+            {
+                Id = 1,
+                CreditsPerHour = 0.2m,
+                CheckIntervalMinutes = 1,
+                MaxSessionMinutes = 480,
+                IsEnabled = true,
+                GracePeriodMinutes = 0,
+                InitialFreeHours = 5,
+                EnforceAccessBlock = true,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        private static ConsumptionConfigDto ConfigFromDto(UpdateConsumptionConfigDto dto)
+        {
+            return new ConsumptionConfigDto
+            {
+                Id = 1,
+                CreditsPerHour = dto.CreditsPerHour,
+                CheckIntervalMinutes = dto.CheckIntervalMinutes,
+                MaxSessionMinutes = dto.MaxSessionMinutes,
+                IsEnabled = dto.IsEnabled,
+                GracePeriodMinutes = dto.GracePeriodMinutes,
+                InitialFreeHours = dto.InitialFreeHours,
+                EnforceAccessBlock = dto.EnforceAccessBlock,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
 
         private static UserSessionDto MapToAppSessionDto(TimerUserSessionDto dto)
         {
@@ -138,6 +262,38 @@ namespace ProcessZero.Infrastructure.Services
                 MinutesElapsed = dto.MinutesElapsed,
                 RemainingCreditBalance = dto.RemainingCreditBalance,
                 Message = dto.Message
+            };
+        }
+
+        private static ConsumptionConfigDto MapToAppConfigDto(TimerConfigDto dto)
+        {
+            return new ConsumptionConfigDto
+            {
+                Id = dto.Id,
+                CreditsPerHour = dto.CreditsPerHour,
+                CheckIntervalMinutes = dto.CheckIntervalMinutes,
+                MaxSessionMinutes = dto.MaxSessionMinutes,
+                IsEnabled = dto.IsEnabled,
+                GracePeriodMinutes = dto.GracePeriodMinutes,
+                InitialFreeHours = dto.InitialFreeHours,
+                EnforceAccessBlock = dto.EnforceAccessBlock,
+                UpdatedAt = dto.UpdatedAt
+            };
+        }
+
+        private static ConsumptionStatsDto MapToAppStatsDto(TimerStatsDto dto)
+        {
+            return new ConsumptionStatsDto
+            {
+                ActiveSessionsCount = dto.ActiveSessionsCount,
+                TotalSessionsToday = dto.TotalSessionsToday,
+                TotalSessionsThisMonth = dto.TotalSessionsThisMonth,
+                TotalCreditsConsumedToday = dto.TotalCreditsConsumedToday,
+                TotalCreditsConsumedThisMonth = dto.TotalCreditsConsumedThisMonth,
+                TotalMinutesLoggedToday = dto.TotalMinutesLoggedToday,
+                TotalMinutesLoggedThisMonth = dto.TotalMinutesLoggedThisMonth,
+                Rate = dto.Rate,
+                IsEnabled = dto.IsEnabled
             };
         }
     }

@@ -21,13 +21,16 @@ namespace ProcessZero.Web.Controllers
     public class ConsumptionController : ControllerBase
     {
         private readonly IConsumptionService _consumptionService;
+        private readonly IUserWalletService _walletService;
         private readonly ILogger<ConsumptionController> _logger;
 
         public ConsumptionController(
             IConsumptionService consumptionService,
+            IUserWalletService walletService,
             ILogger<ConsumptionController> logger)
         {
             _consumptionService = consumptionService ?? throw new ArgumentNullException(nameof(consumptionService));
+            _walletService = walletService ?? throw new ArgumentNullException(nameof(walletService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -127,8 +130,16 @@ namespace ProcessZero.Web.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetConfig(CancellationToken cancellationToken)
         {
-            var config = await _consumptionService.GetConfigAsync(cancellationToken);
-            return Ok(config);
+            try
+            {
+                var config = await _consumptionService.GetConfigAsync(cancellationToken);
+                return Ok(config);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting consumption config");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to load configuration." });
+            }
         }
 
         /// <summary>
@@ -142,8 +153,36 @@ namespace ProcessZero.Web.Controllers
             if (dto == null)
                 return BadRequest(new { error = "Configuration data is required." });
 
-            var config = await _consumptionService.UpdateConfigAsync(dto, cancellationToken);
-            return Ok(config);
+            try
+            {
+                var config = await _consumptionService.UpdateConfigAsync(dto, cancellationToken);
+                return Ok(config);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating consumption config");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "An unexpected error occurred while updating configuration." });
+            }
+        }
+
+        /// <summary>
+        /// DELETE: api/Consumption/config
+        /// Delete/reset the consumption configuration to defaults (admin only).
+        /// </summary>
+        [HttpDelete("config")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteConfig(CancellationToken cancellationToken)
+        {
+            try
+            {
+                var config = await _consumptionService.DeleteConfigAsync(cancellationToken);
+                return Ok(new { message = "Configuration reset to defaults", config });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resetting consumption config");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to reset configuration." });
+            }
         }
 
         /// <summary>
@@ -154,8 +193,16 @@ namespace ProcessZero.Web.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAllActiveSessions(CancellationToken cancellationToken)
         {
-            var sessions = await _consumptionService.GetAllActiveSessionsAsync(cancellationToken);
-            return Ok(sessions);
+            try
+            {
+                var sessions = await _consumptionService.GetAllActiveSessionsAsync(cancellationToken);
+                return Ok(sessions);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting active sessions");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to load active sessions." });
+            }
         }
 
         /// <summary>
@@ -166,11 +213,18 @@ namespace ProcessZero.Web.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ForceEndSession(int sessionId, CancellationToken cancellationToken)
         {
-            var result = await _consumptionService.ForceEndSessionAsync(sessionId, cancellationToken);
-            if (!result)
-                return NotFound(new { error = $"Active session with ID {sessionId} not found." });
-
-            return Ok(new { message = "Session force-ended." });
+            try
+            {
+                var result = await _consumptionService.ForceEndSessionAsync(sessionId, cancellationToken);
+                if (!result)
+                    return NotFound(new { error = $"Active session with ID {sessionId} not found." });
+                return Ok(new { message = "Session force-ended." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error force-ending session");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to force-end session." });
+            }
         }
 
         /// <summary>
@@ -181,8 +235,16 @@ namespace ProcessZero.Web.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetStats(CancellationToken cancellationToken)
         {
-            var stats = await _consumptionService.GetStatsAsync(cancellationToken);
-            return Ok(stats);
+            try
+            {
+                var stats = await _consumptionService.GetStatsAsync(cancellationToken);
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting consumption stats");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Failed to load statistics." });
+            }
         }
     }
 }

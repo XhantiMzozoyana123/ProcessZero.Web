@@ -1,158 +1,167 @@
 using System.Globalization;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PayPalCheckoutSdk.Core;
+using PayPalCheckoutSdk.Orders;
+using PayPalHttp;
 using ProcessZero.Application.Interfaces;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace ProcessZero.Infrastructure.Services
 {
     public class PayPalService : IPayPalService
     {
         private readonly IConfiguration _configuration;
-        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<PayPalService> _logger;
+        private readonly PayPalHttpClient _payPalClient;
 
-        private string AccessToken { get; set; } = string.Empty;
-        private DateTime AccessTokenExpiresAt { get; set; }
-
-        public PayPalService(IConfiguration configuration, IHttpClientFactory httpClientFactory, ILogger<PayPalService> logger)
+        public PayPalService(IConfiguration configuration, ILogger<PayPalService> logger)
         {
             _configuration = configuration;
-            _httpClientFactory = httpClientFactory;
             _logger = logger;
-        }
-
-        private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default)
-        {
-            if (!string.IsNullOrEmpty(AccessToken) && AccessTokenExpiresAt > DateTime.UtcNow.AddMinutes(5))
-                return AccessToken;
 
             var clientId = _configuration["PayPal:ClientId"];
             var clientSecret = _configuration["PayPal:ClientSecret"];
             var environment = _configuration["PayPal:Environment"] ?? "Sandbox";
-            var baseUrl = environment.Equals("Live", StringComparison.OrdinalIgnoreCase)
-                ? "https://api-m.paypal.com"
-                : "https://api-m.sandbox.paypal.com";
 
-            var client = _httpClientFactory.CreateClient();
-            var authValue = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authValue);
+            if (string.IsNullOrWhiteSpace(clientId))
+                throw new InvalidOperationException("PayPal ClientId is not configured.");
 
-            var requestBody = new StringContent("grant_type=client_credentials", Encoding.UTF8, "application/x-www-form-urlencoded");
+            if (string.IsNullOrWhiteSpace(clientSecret))
+                throw new InvalidOperationException("PayPal ClientSecret is not configured.");
 
-            var response = await client.PostAsync($"{baseUrl}/v1/oauth2/token", requestBody, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            PayPalEnvironment payPalEnvironment;
+            if (environment.Equals("Live", StringComparison.OrdinalIgnoreCase))
             {
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("Failed to get PayPal access token: {Error}", error);
-                throw new InvalidOperationException("Failed to get PayPal access token.");
+                payPalEnvironment = new LiveEnvironment(clientId, clientSecret);
+            }
+            else
+            {
+                payPalEnvironment = new SandboxEnvironment(clientId, clientSecret);
             }
 
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-            AccessToken = doc.RootElement.GetProperty("access_token").GetString() ?? string.Empty;
-            var expiresIn = doc.RootElement.GetProperty("expires_in").GetInt32();
-            AccessTokenExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn);
-
-            return AccessToken;
+            _payPalClient = new PayPalHttpClient(payPalEnvironment);
         }
 
-        public async Task<(string OrderId, string ApprovalUrl)> CreateOrderAsync(decimal amount, string currency, string returnUrl, string cancelUrl, CancellationToken cancellationToken = default)
+        public async Task<(string OrderId, string ApprovalUrl)> CreateOrderAsync(
+            decimal amount,
+            string currency,
+            string returnUrl,
+            string cancelUrl,
+            CancellationToken cancellationToken = default)
         {
-            var environment = _configuration["PayPal:Environment"] ?? "Sandbox";
-            var baseUrl = environment.Equals("Live", StringComparison.OrdinalIgnoreCase)
-                ? "https://api-m.paypal.com"
-                : "https://api-m.sandbox.paypal.com";
-
-            var token = await GetAccessTokenAsync(cancellationToken);
-            var client = _httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-            var payload = new
+            try
             {
-                intent = "CAPTURE",
-                purchase_units = new[]
+                var payloadCurrency = _configuration["PayPal:Currency"] ?? currency;
+
+                var orderRequest = new OrderRequest()
                 {
-                    new
+                    CheckoutPaymentIntent = "CAPTURE",
+                    ApplicationContext = new ApplicationContext
                     {
-                        amount = new
+                        BrandName = "Process Zero",
+                        LandingPage = "LOGIN",
+                        UserAction = "PAY_NOW",
+                        ReturnUrl = returnUrl,
+                        CancelUrl = cancelUrl
+                    },
+                    PurchaseUnits = new List<PurchaseUnitRequest>
+                    {
+                        new PurchaseUnitRequest
                         {
-                            currency_code = currency,
-                            value = amount.ToString("0.00", CultureInfo.InvariantCulture)
+                            AmountWithBreakdown = new AmountWithBreakdown
+                            {
+                                CurrencyCode = payloadCurrency,
+                                Value = amount.ToString("0.00", CultureInfo.InvariantCulture)
+                            }
                         }
                     }
-                },
-                application_context = new
+                };
+
+                var request = new OrdersCreateRequest();
+                request.Prefer("return=representation");
+                request.RequestBody(orderRequest);
+
+                _logger.LogInformation("Creating PayPal order for amount {Amount} {Currency}", amount, payloadCurrency);
+
+                // Note: The legacy SDK's Execute method doesn't accept a CancellationToken natively,
+                // but we keep it in the signature for interface compliance.
+                var response = await _payPalClient.Execute(request);
+                var result = response.Result<Order>();
+
+                var approvalLink = result.Links.FirstOrDefault(l => l.Rel == "approve" || l.Rel == "payer-action");
+                if (approvalLink == null || string.IsNullOrWhiteSpace(approvalLink.Href))
                 {
-                    return_url = returnUrl,
-                    cancel_url = cancelUrl,
-                    brand_name = "Process Zero",
-                    landing_page = "LOGIN",
-                    user_action = "PAY_NOW"
+                    throw new InvalidOperationException("PayPal did not return an approval URL.");
                 }
-            };
 
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"{baseUrl}/v2/checkout/orders", content, cancellationToken);
+                _logger.LogInformation("PayPal order created successfully. OrderId: {OrderId}", result.Id);
 
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("PayPal create order failed: {Error}", error);
-                throw new InvalidOperationException("Failed to create PayPal order.");
+                return (result.Id, approvalLink.Href);
             }
-
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-            var orderId = doc.RootElement.GetProperty("id").GetString() ?? string.Empty;
-
-            // Extract approval URL from links — safely handle missing "approve" link
-            var approveLink = doc.RootElement
-                .GetProperty("links")
-                .EnumerateArray()
-                .FirstOrDefault(link => link.GetProperty("rel").GetString() == "approve");
-
-            var approvalUrl = string.Empty;
-            if (approveLink.ValueKind != JsonValueKind.Undefined)
+            catch (HttpException ex)
             {
-                approvalUrl = approveLink.GetProperty("href").GetString() ?? string.Empty;
-            }
+                // Extract the deep debug information provided by PayPal's API
+                string debugId = ex.Headers.Contains("PayPal-Debug-Id")
+                    ? string.Join(",", ex.Headers.GetValues("PayPal-Debug-Id"))
+                    : "Unknown";
 
-            if (string.IsNullOrEmpty(approvalUrl))
+                _logger.LogError(ex, "PayPal order creation failed. Status: {StatusCode}, DebugID: {DebugId}, Content: {ResponseBody}",
+                    ex.StatusCode, debugId, ex.Message);
+
+                throw new InvalidOperationException(
+                    $"PayPal order creation failed ({(int)ex.StatusCode} {ex.StatusCode}). DebugID: {debugId}. See logs for details.", ex);
+            }
+            catch (Exception ex)
             {
-                _logger.LogError("PayPal order {OrderId} created but no approval URL found in response: {Response}", orderId, json);
-                throw new InvalidOperationException("Failed to get PayPal approval URL.");
+                _logger.LogError(ex, "Unexpected error during PayPal order creation");
+                throw;
             }
-
-            return (orderId, approvalUrl);
         }
 
-        public async Task<string> CaptureOrderAsync(string orderId, CancellationToken cancellationToken = default)
+        public async Task<string> CaptureOrderAsync(
+            string orderId,
+            CancellationToken cancellationToken = default)
         {
-            var environment = _configuration["PayPal:Environment"] ?? "Sandbox";
-            var baseUrl = environment.Equals("Live", StringComparison.OrdinalIgnoreCase)
-                ? "https://api-m.paypal.com"
-                : "https://api-m.sandbox.paypal.com";
-
-            var token = await GetAccessTokenAsync(cancellationToken);
-            var client = _httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-            var content = new StringContent("{}", Encoding.UTF8, "application/json");
-            var response = await client.PostAsync($"{baseUrl}/v2/checkout/orders/{orderId}/capture", content, cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
+            if (string.IsNullOrWhiteSpace(orderId))
             {
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("PayPal capture order failed: {Error}", error);
-                throw new InvalidOperationException("Failed to capture PayPal order.");
+                throw new ArgumentException("Order ID cannot be null or empty.", nameof(orderId));
             }
 
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.GetRawText();
+            try
+            {
+                _logger.LogInformation("Capturing PayPal order {OrderId}", orderId);
+
+                var request = new OrdersCaptureRequest(orderId);
+                request.RequestBody(new OrderActionRequest());
+
+                var response = await _payPalClient.Execute(request);
+                var result = response.Result<Order>();
+
+                _logger.LogInformation("PayPal order captured successfully. OrderId: {OrderId}, Status: {Status}",
+                    result.Id, result.Status);
+
+                var jsonResult = JsonSerializer.Serialize(result);
+                return jsonResult;
+            }
+            catch (HttpException ex)
+            {
+                string debugId = ex.Headers.Contains("PayPal-Debug-Id")
+                    ? string.Join(",", ex.Headers.GetValues("PayPal-Debug-Id"))
+                    : "Unknown";
+
+                _logger.LogError(ex, "PayPal capture failed. Status: {StatusCode}, DebugID: {DebugId}, Content: {ResponseBody}",
+                    ex.StatusCode, debugId, ex.Message);
+
+                throw new InvalidOperationException(
+                    $"PayPal capture failed ({(int)ex.StatusCode} {ex.StatusCode}). DebugID: {debugId}. See logs for details.", ex);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error during PayPal order capture");
+                throw;
+            }
         }
     }
 }

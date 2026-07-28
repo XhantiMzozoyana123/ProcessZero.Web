@@ -6,6 +6,7 @@ using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using ProcessZero.Infrastructure.Filters;
 using ProcessZero.Infrastructure.Services;
+using ProcessZero.Infrastructure.Filters;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -34,9 +35,15 @@ namespace ProcessZero.Web.Controllers
             User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
         [HttpGet("wallet")]
+        [AllowTimerService]  // Accepts either JWT or X-Timer-Api-Key header
         public async Task<IActionResult> GetWallet()
         {
+            // Try JWT claim first, then fall back to X-User-Id header (for service-to-service auth)
             var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                userId = Request.Headers["X-User-Id"].FirstOrDefault();
+            }
             if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
             var wallet = await _walletService.GetUserWalletAsync(userId);
@@ -86,11 +93,15 @@ namespace ProcessZero.Web.Controllers
         }
 
         [HttpPost("consume")]
-        [Authorize]
-        [ServiceApiKeyAuth]  // Accepts either JWT or X-Timer-Api-Key header
+        [AllowTimerService]  // Accepts either JWT or X-Timer-Api-Key header
         public async Task<IActionResult> ConsumeCredits([FromBody] ConsumeCreditsRequestDto request)
         {
+            // Try JWT claim first, then fall back to X-User-Id header (for service-to-service auth)
             var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                userId = Request.Headers["X-User-Id"].FirstOrDefault();
+            }
             if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
             if (request == null) return BadRequest("Consume request is required.");
@@ -104,15 +115,42 @@ namespace ProcessZero.Web.Controllers
         }
 
         [HttpPost("check")]
-        [Authorize]
-        [ServiceApiKeyAuth]  // Accepts either JWT or X-Timer-Api-Key header
+        [AllowTimerService]  // Accepts either JWT or X-Timer-Api-Key header
         public async Task<IActionResult> CheckCreditBalance([FromBody] decimal requiredCredits)
         {
+            // Try JWT claim first, then fall back to X-User-Id header (for service-to-service auth)
             var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                userId = Request.Headers["X-User-Id"].FirstOrDefault();
+            }
             if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
             var result = await _walletService.CheckCreditBalanceAsync(userId, requiredCredits);
             return Ok(result);
+        }
+
+        [HttpGet("remaining-hours")]
+        [AllowTimerService]  // Accepts either JWT or X-Timer-Api-Key header
+        public async Task<IActionResult> GetRemainingHours(CancellationToken cancellationToken)
+        {
+            // Try JWT claim first, then fall back to X-User-Id header (for service-to-service auth)
+            var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                userId = Request.Headers["X-User-Id"].FirstOrDefault();
+            }
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            // Delegate to standalone ProcessZero.TimerService which tracks sessions independently
+            var result = await _timerService.GetRemainingHoursAsync(userId, cancellationToken);
+            if (result == null)
+            {
+                // Fallback to direct service
+                var remainingHours = await _walletService.GetRemainingHoursAsync(userId, cancellationToken);
+                return Ok(new { remainingHours });
+            }
+            return Ok(new { remainingHours = result.RemainingHours });
         }
 
         [HttpGet("transactions")]
@@ -162,25 +200,6 @@ namespace ProcessZero.Web.Controllers
             return Ok(wallet);
         }
 
-        [HttpGet("remaining-hours")]
-        [Authorize]
-        [ServiceApiKeyAuth]  // Accepts either JWT or X-Timer-Api-Key header
-        public async Task<IActionResult> GetRemainingHours(CancellationToken cancellationToken)
-        {
-            var userId = GetUserId();
-            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
-
-            // Delegate to standalone ProcessZero.TimerService which tracks sessions independently
-            var result = await _timerService.GetRemainingHoursAsync(userId, cancellationToken);
-            if (result == null)
-            {
-                // Fallback to direct service
-                var remainingHours = await _walletService.GetRemainingHoursAsync(userId, cancellationToken);
-                return Ok(new { remainingHours });
-            }
-            return Ok(new { remainingHours = result.RemainingHours });
-        }
-
         [HttpPost("consume-active-usage")]
         public async Task<IActionResult> ConsumeActiveUsage([FromQuery] int minutes = 10, CancellationToken cancellationToken = default)
         {
@@ -213,9 +232,21 @@ namespace ProcessZero.Web.Controllers
             var returnUrl = request.ReturnUrl ?? $"{webUrl}/account/credits/wallet?paypal=success";
             var cancelUrl = request.CancelUrl ?? $"{webUrl}/account/credits/packages?paypal=cancelled";
 
-            var (orderId, approvalUrl) = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl, cancellationToken);
-
-            return Ok(new { orderId, approvalUrl, packageId = package.Id });
+            try
+            {
+                var (orderId, approvalUrl) = await _payPalService.CreateOrderAsync(package.Price, package.Currency, returnUrl, cancelUrl, cancellationToken);
+                return Ok(new { orderId, approvalUrl, packageId = package.Id });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "PayPal order creation failed for package {PackageId}", request.PackageId);
+                return StatusCode(500, new { message = "PayPal payment setup failed. Please check payment configuration or try again later." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error during PayPal order creation for package {PackageId}", request.PackageId);
+                return StatusCode(500, new { message = "An unexpected error occurred while setting up PayPal payment." });
+            }
         }
 
         [HttpPost("paypal/capture")]

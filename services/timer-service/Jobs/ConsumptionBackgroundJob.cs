@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using ProcessZero.TimerService.Dtos;
+using System.Net.Http.Json;
 
 namespace ProcessZero.TimerService.Jobs;
 
@@ -14,13 +16,14 @@ public class ConsumptionBackgroundJob
     public ConsumptionBackgroundJob(ILogger logger, IConfiguration configuration)
     {
         _logger = logger;
-        _timerApiKey = configuration["TimerApiKey"] 
+        _timerApiKey = configuration["TimerApiKey"]
             ?? throw new InvalidOperationException("TimerApiKey is required.");
     }
 
     /// <summary>
-    /// Processes all active sessions, consuming credits for elapsed time.
-    /// Called periodically by Hangfire (every minute).
+    /// Processes all active sessions, consuming credits for elapsed time since last processing.
+    /// Called periodically by the background timer (every minute).
+    /// Uses LastProcessedUtc to calculate incremental consumption so credits are not overcharged.
     /// </summary>
     public async Task ProcessActiveSessionsAsync(string mainApiUrl)
     {
@@ -37,25 +40,38 @@ public class ConsumptionBackgroundJob
             {
                 try
                 {
-                    var elapsedMinutes = (DateTime.UtcNow - session.StartedAt).TotalMinutes;
-                    if (elapsedMinutes <= 0) continue;
+                    var now = DateTime.UtcNow;
 
-                    var creditsToConsume = decimal.Round((decimal)elapsedMinutes * 0.2m / 60.0m, 6);
+                    // Calculate minutes elapsed since last processing (incremental)
+                    var lastProcessed = session.LastProcessedUtc ?? session.SessionStartUtc;
+                    var incrementalMinutes = (now - lastProcessed).TotalMinutes;
+                    if (incrementalMinutes <= 0) continue;
+
+                    var creditsToConsume = decimal.Round((decimal)incrementalMinutes * TimerConfig.CreditsPerHour / 60.0m, 6);
                     if (creditsToConsume <= 0) continue;
 
                     if (creditsToConsume > 0)
                     {
-                        var response = await http.PostAsJsonAsync($"{mainApiUrl}/api/credit/consume", new
+                        var request = new HttpRequestMessage(HttpMethod.Post, $"{mainApiUrl}/api/credit/consume")
                         {
-                            UserId = session.UserId,
-                            CreditAmount = creditsToConsume,
-                            Description = "Auto consumption from active session",
-                            RelatedEntityType = "Session",
-                            RelatedEntityId = session.Id
-                        });
+                            Content = JsonContent.Create(new
+                            {
+                                UserId = session.UserId,
+                                CreditAmount = creditsToConsume,
+                                Description = "Auto consumption from active session",
+                                RelatedEntityType = "Session",
+                                RelatedEntityId = session.Id
+                            })
+                        };
+                        request.Headers.Add("X-Timer-Api-Key", _timerApiKey);
+                        request.Headers.Add("X-User-Id", session.UserId);
+
+                        var response = await http.SendAsync(request);
 
                         if (response.IsSuccessStatusCode)
                         {
+                            // Update last processed timestamp only on successful consumption
+                            session.LastProcessedUtc = now;
                             processed++;
                         }
                         else

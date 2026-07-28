@@ -33,11 +33,13 @@
   </ItemGroup>
 
   <!-- Explicitly include only this project's own .cs files, excluding referenced project
-       source files and build artifacts. Using forward slashes ensures cross-platform
-       compatibility (critical for Docker/Linux builds). -->
+       source files, the standalone timer-service project, and build artifacts.
+       Using forward slashes ensures cross-platform compatibility (critical for Docker/Linux builds).
+       Note: obj/** and bin/** only match root-level directories in MSBuild, so we also
+       include **/obj/** and **/bin/** to exclude nested build artifact directories
+       (e.g., services/timer-service/obj/ and services/timer-service/bin/). -->
   <ItemGroup>
-    <Compile Include="**/*.cs"
-             Exclude="bin/**;obj/**;ProcessZero.Domain/**/*.cs;ProcessZero.Infrastructure/**/*.cs;ProcessZero.Application/**/*.cs" />
+    <Compile Include="**/*.cs" Exclude="bin/**;obj/**;**/bin/**;**/obj/**;services/**;ProcessZero.Domain/**/*.cs;ProcessZero.Infrastructure/**/*.cs;ProcessZero.Application/**/*.cs" />
   </ItemGroup>
 
 </Project>

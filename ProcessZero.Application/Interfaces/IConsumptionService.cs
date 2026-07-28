@@ -52,6 +52,11 @@ namespace ProcessZero.Application.Interfaces
         Task<ConsumptionConfigDto> UpdateConfigAsync(UpdateConsumptionConfigDto dto, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Delete/reset the consumption configuration to defaults (admin only)
+        /// </summary>
+        Task<ConsumptionConfigDto> DeleteConfigAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Get all active sessions across all users (admin view)
         /// </summary>
         Task<List<UserSessionDto>> GetAllActiveSessionsAsync(CancellationToken cancellationToken = default);

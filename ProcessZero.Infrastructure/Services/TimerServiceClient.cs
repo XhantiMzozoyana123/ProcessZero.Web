@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ProcessZero.Application.Dtos;
 
 namespace ProcessZero.Infrastructure.Services;
 
@@ -145,6 +146,101 @@ public class TimerServiceClient
             return null;
         }
     }
+
+    // ── Timer Configuration CRUD (Admin) ──
+
+    public async Task<TimerConfigDto?> GetConfigAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("config", cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<TimerConfigDto>(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get timer config");
+            return null;
+        }
+    }
+
+    public async Task<TimerConfigDto?> UpdateConfigAsync(TimerConfigDto dto, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync("config", dto, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<TimerConfigDto>(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update timer config");
+            return null;
+        }
+    }
+
+    public async Task<TimerConfigDto?> DeleteConfigAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync("config", cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<DeleteConfigResponse>(cancellationToken: cancellationToken);
+            return result?.Config;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete timer config");
+            return null;
+        }
+    }
+
+    // ── Admin Session Management ──
+
+    public async Task<List<TimerUserSessionDto>?> GetAllActiveSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("sessions", cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<List<TimerUserSessionDto>>(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get all active sessions");
+            return null;
+        }
+    }
+
+    public async Task<bool> ForceEndSessionAsync(int sessionId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"sessions/{sessionId}/force-end", null, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to force-end session {SessionId}", sessionId);
+            return false;
+        }
+    }
+
+    public async Task<TimerStatsDto?> GetStatsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("stats", cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<TimerStatsDto>(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get timer stats");
+            return null;
+        }
+    }
+
 }
 
 // ── Options ──
@@ -209,4 +305,36 @@ public class TimerCheckBalanceResponse
 public class TimerActiveSessionResponse
 {
     public TimerUserSessionDto? Session { get; set; }
+}
+
+public class TimerConfigDto
+{
+    public int Id { get; set; } = 1;
+    public decimal CreditsPerHour { get; set; } = 0.2m;
+    public int CheckIntervalMinutes { get; set; } = 1;
+    public int MaxSessionMinutes { get; set; } = 480;
+    public bool IsEnabled { get; set; } = true;
+    public int GracePeriodMinutes { get; set; } = 0;
+    public decimal InitialFreeHours { get; set; } = 5;
+    public bool EnforceAccessBlock { get; set; } = true;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class TimerStatsDto
+{
+    public int ActiveSessionsCount { get; set; }
+    public int TotalSessionsToday { get; set; }
+    public int TotalSessionsThisMonth { get; set; }
+    public decimal TotalCreditsConsumedToday { get; set; }
+    public decimal TotalCreditsConsumedThisMonth { get; set; }
+    public decimal TotalMinutesLoggedToday { get; set; }
+    public decimal TotalMinutesLoggedThisMonth { get; set; }
+    public decimal Rate { get; set; }
+    public bool IsEnabled { get; set; }
+}
+
+public class DeleteConfigResponse
+{
+    public string Message { get; set; } = string.Empty;
+    public TimerConfigDto? Config { get; set; }
 }

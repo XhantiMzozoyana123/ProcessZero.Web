@@ -31,23 +31,22 @@ namespace ProcessZero.Infrastructure.Filters
                 return;
             }
 
-            if (!context.HttpContext.Request.Headers.TryGetValue(ApiKeyHeaderName, out var providedApiKey))
+            if (context.HttpContext.Request.Headers.TryGetValue(ApiKeyHeaderName, out var providedApiKey))
             {
-                logger?.LogWarning("Missing X-Timer-Api-Key header");
-                context.Result = new UnauthorizedResult();
-                return;
-            }
+                // API key was provided - validate it
+                if (!string.Equals(providedApiKey.ToString(), expectedApiKey, StringComparison.Ordinal))
+                {
+                    logger?.LogWarning("Invalid API key provided");
+                    context.Result = new UnauthorizedResult();
+                    return;
+                }
 
-            if (!string.Equals(providedApiKey.ToString(), expectedApiKey, StringComparison.Ordinal))
-            {
-                logger?.LogWarning("Invalid API key provided");
-                context.Result = new UnauthorizedResult();
-                return;
+                // API key is valid - bypass JWT authorization requirement
+                context.Result = null;
+                logger?.LogInformation("Service-to-service authentication successful via API key");
             }
+            // else: No API key header - let [Authorize] handle JWT authentication normally
 
-            // API key is valid - bypass JWT authorization requirement
-            context.Result = null;
-            logger?.LogInformation("Service-to-service authentication successful via API key");
             await Task.CompletedTask;
         }
     }

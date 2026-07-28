@@ -254,7 +254,8 @@ builder.Services.AddScoped<IWebinarService, WebinarService>();
 builder.Services.AddScoped<ImportProcessor>();
 builder.Services.AddScoped<IExtractService, ExtractService>();
 // Consumption/session management is now handled by the standalone ProcessZero.TimerService
-// The TimerServiceClient proxies calls to it. No local consumption service is needed.
+// The TimerServiceClient proxies calls to it.
+builder.Services.AddScoped<IConsumptionService, ConsumptionService>();
 
 // -----------------------------
 // BACKGROUND SERVICES
