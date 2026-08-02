@@ -487,6 +487,35 @@ namespace ProcessZero.Domain
                 e.HasIndex(p => p.SortOrder)
                     .HasDatabaseName("IX_CreditPackages_SortOrder");
             });
+
+            modelBuilder.Entity<PaymentOrder>(e =>
+            {
+                e.Property(p => p.UserId).HasMaxLength(450);
+                e.Property(p => p.OrderId).HasMaxLength(256).IsRequired();
+                e.Property(p => p.Currency).HasMaxLength(3);
+                e.Property(p => p.PayShapAccountNumber).HasMaxLength(256);
+                e.Property(p => p.PayShapAccountHolder).HasMaxLength(256);
+                e.Property(p => p.PayShapReference).HasMaxLength(256);
+                e.Property(p => p.Status).HasMaxLength(50);
+                e.Property(p => p.UserEmail).HasMaxLength(256);
+                e.Property(p => p.UserPhone).HasMaxLength(20);
+                e.Property(p => p.BankTransactionReference).HasMaxLength(256);
+
+                e.HasIndex(p => p.UserId).HasDatabaseName("IX_PaymentOrders_UserId");
+                e.HasIndex(p => p.OrderId).IsUnique().HasDatabaseName("IX_PaymentOrders_OrderId");
+                e.HasIndex(p => p.Status).HasDatabaseName("IX_PaymentOrders_Status");
+                e.HasIndex(p => new { p.UserId, p.CreatedAt }).HasDatabaseName("IX_PaymentOrders_UserId_CreatedAt").IsDescending(false, true);
+
+                e.HasOne(p => p.User)
+                    .WithMany()
+                    .HasForeignKey(p => p.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(p => p.CreditPackage)
+                    .WithMany()
+                    .HasForeignKey(p => p.CreditPackageId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
         }
 
         public DbSet<KPI> KPIs { get; set; }
@@ -527,6 +556,7 @@ namespace ProcessZero.Domain
         public DbSet<UserWallet> UserWallets { get; set; }
         public DbSet<CreditTransaction> CreditTransactions { get; set; }
         public DbSet<CreditPackage> CreditPackages { get; set; }
+        public DbSet<PaymentOrder> PaymentOrders { get; set; }
 
         // Session tracking for credit consumption
         public DbSet<UserSession> UserSessions { get; set; }

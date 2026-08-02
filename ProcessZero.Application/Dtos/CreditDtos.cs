@@ -45,7 +45,7 @@ namespace ProcessZero.Application.Dtos
         public string Description { get; set; } = string.Empty;
         public decimal CreditAmount { get; set; }
         public decimal Price { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ZAR";
         public int? DurationMinutes { get; set; }
         public bool IsActive { get; set; }
         public int SortOrder { get; set; }
@@ -106,7 +106,7 @@ namespace ProcessZero.Application.Dtos
         public string Description { get; set; } = string.Empty;
         public decimal CreditAmount { get; set; }
         public decimal Price { get; set; }
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ZAR";
         public int? DurationMinutes { get; set; }
         public bool IsActive { get; set; } = true;
         public int SortOrder { get; set; } = 0;
@@ -119,6 +119,7 @@ namespace ProcessZero.Application.Dtos
         public int PackageId { get; set; }
         public string? ReturnUrl { get; set; }
         public string? CancelUrl { get; set; }
+        public string? Email { get; set; }
     }
 
     public class CapturePayPalOrderRequest

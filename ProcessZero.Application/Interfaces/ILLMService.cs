@@ -9,5 +9,6 @@ namespace ProcessZero.Application.Interfaces
     public interface ILLMService
     {
         Task<string> GenerateTextAsync(string prompt);
+        Task<bool> VerifyPaymentProofAsync(string base64Image, decimal expectedAmount, string currency);
     }
 }

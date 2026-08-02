@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ProcessZero.Domain;
 
 #nullable disable
 
-namespace ProcessZero.Domain.Migrations
+namespace ProcessZero.Web.ProcessZero.Domain.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260801000645_AddPaymentOrderEntity")]
+    partial class AddPaymentOrderEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1097,8 +1100,7 @@ namespace ProcessZero.Domain.Migrations
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("varchar(450)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("UserPhone")
                         .HasMaxLength(20)
@@ -1109,21 +1111,7 @@ namespace ProcessZero.Domain.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreditPackageId");
-
-                    b.HasIndex("OrderId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_PaymentOrders_OrderId");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("IX_PaymentOrders_Status");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("IX_PaymentOrders_UserId");
-
-                    b.HasIndex("UserId", "CreatedAt")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_PaymentOrders_UserId_CreatedAt");
+                    b.HasIndex("UserId");
 
                     b.ToTable("PaymentOrders");
                 });
@@ -2423,19 +2411,11 @@ namespace ProcessZero.Domain.Migrations
 
             modelBuilder.Entity("ProcessZero.Domain.Entities.PaymentOrder", b =>
                 {
-                    b.HasOne("ProcessZero.Domain.Entities.CreditPackage", "CreditPackage")
-                        .WithMany()
-                        .HasForeignKey("CreditPackageId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("ProcessZero.Domain.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("CreditPackage");
 
                     b.Navigation("User");
                 });

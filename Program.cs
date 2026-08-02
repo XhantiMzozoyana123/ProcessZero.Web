@@ -215,6 +215,7 @@ builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserWalletService, UserWalletService>();
 builder.Services.AddScoped<IPayPalService, PayPalService>();
+builder.Services.AddScoped<IPayGateService, PayGateService>();
 builder.Services.AddScoped<IAssessmentService, AssessmentService>();
 builder.Services.AddScoped<ISurveyService, SurveyService>();
 builder.Services.AddScoped<IInboxService, InboxService>();
@@ -423,68 +424,74 @@ async Task SeedAdminUser(
 // -----------------------------
 async Task SeedCreditPackages(ApplicationDbContext context)
 {
-    if (!await context.CreditPackages.AnyAsync())
+    // Delete all existing credit packages and reseed
+    var existingPackages = await context.CreditPackages.ToListAsync();
+    if (existingPackages.Any())
     {
-        var packages = new List<CreditPackage>
-        {
-            new CreditPackage
-            {
-                Name = "Starter Pack",
-                Description = "10 credits for new users to get started",
-                CreditAmount = 10,
-                Price = 9.99m,
-                Currency = "USD",
-                DurationMinutes = 60,
-                IsActive = true,
-                SortOrder = 1,
-                IsSubscription = false,
-                CreatedAt = DateTime.UtcNow
-            },
-            new CreditPackage
-            {
-                Name = "Pro Pack",
-                Description = "50 credits for active sales professionals",
-                CreditAmount = 50,
-                Price = 39.99m,
-                Currency = "USD",
-                DurationMinutes = 60,
-                IsActive = true,
-                SortOrder = 2,
-                DiscountPercentage = 20,
-                IsSubscription = false,
-                CreatedAt = DateTime.UtcNow
-            },
-            new CreditPackage
-            {
-                Name = "Enterprise Pack",
-                Description = "200 credits for high-volume users",
-                CreditAmount = 200,
-                Price = 149.99m,
-                Currency = "USD",
-                DurationMinutes = 60,
-                IsActive = true,
-                SortOrder = 3,
-                DiscountPercentage = 25,
-                IsSubscription = false,
-                CreatedAt = DateTime.UtcNow
-            },
-            new CreditPackage
-            {
-                Name = "Monthly Subscription",
-                Description = "30 credits every month, auto-renewing",
-                CreditAmount = 30,
-                Price = 24.99m,
-                Currency = "USD",
-                DurationMinutes = 60,
-                IsActive = true,
-                SortOrder = 4,
-                IsSubscription = true,
-                CreatedAt = DateTime.UtcNow
-            }
-        };
-
-        context.CreditPackages.AddRange(packages);
+        context.CreditPackages.RemoveRange(existingPackages);
         await context.SaveChangesAsync();
-        Console.WriteLine("✅ Seeded initial credit packages");
+        Console.WriteLine("🗑️  Deleted existing credit packages");
     }
+
+    var packages = new List<CreditPackage>
+    {
+        new CreditPackage
+        {
+            Name = "Starter Pack",
+            Description = "10 credits for new users to get started",
+            CreditAmount = 10,
+            Price = 150.00m,
+            Currency = "ZAR",
+            DurationMinutes = 60,
+            IsActive = true,
+            SortOrder = 1,
+            IsSubscription = false,
+            CreatedAt = DateTime.UtcNow
+        },
+        new CreditPackage
+        {
+            Name = "Pro Pack",
+            Description = "50 credits for active sales professionals",
+            CreditAmount = 50,
+            Price = 599.99m,
+            Currency = "ZAR",
+            DurationMinutes = 60,
+            IsActive = true,
+            SortOrder = 2,
+            DiscountPercentage = 20,
+            IsSubscription = false,
+            CreatedAt = DateTime.UtcNow
+        },
+        new CreditPackage
+        {
+            Name = "Enterprise Pack",
+            Description = "200 credits for high-volume users",
+            CreditAmount = 200,
+            Price = 1499.99m,
+            Currency = "ZAR",
+            DurationMinutes = 60,
+            IsActive = true,
+            SortOrder = 3,
+            DiscountPercentage = 25,
+            IsSubscription = false,
+            CreatedAt = DateTime.UtcNow
+        },
+        new CreditPackage
+        {
+            Name = "Monthly Subscription",
+            Description = "30 credits every month, auto-renewing",
+            CreditAmount = 30,
+            Price = 249.99m,
+            Currency = "ZAR",
+            DurationMinutes = 60,
+            IsActive = true,
+            SortOrder = 4,
+            IsSubscription = true,
+            CreatedAt = DateTime.UtcNow
+        }
+    };
+
+    context.CreditPackages.AddRange(packages);
+    await context.SaveChangesAsync();
+    Console.WriteLine("✅ Seeded credit packages");
 }

@@ -32,10 +32,10 @@ namespace ProcessZero.Domain.Entities
         public decimal Price { get; set; }
 
         /// <summary>
-        /// Currency code (USD, EUR, etc.)
+        /// Currency code (ZAR, USD, EUR, etc.)
         /// </summary>
         [StringLength(3)]
-        public string Currency { get; set; } = "USD";
+        public string Currency { get; set; } = "ZAR";
 
         /// <summary>
         /// Time duration in minutes that credits provide (e.g., 60 credits = 60 minutes of access)
