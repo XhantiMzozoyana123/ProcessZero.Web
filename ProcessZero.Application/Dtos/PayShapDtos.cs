@@ -48,6 +48,12 @@ namespace ProcessZero.Application.Dtos
         public string Message { get; set; } = string.Empty;
         public string OrderId { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        /// <summary>
+        /// Indicates whether the AI verification of the payment proof image passed.
+        /// When false, the user should retry uploading a valid payment screenshot.
+        /// Credits are only added when this is true.
+        /// </summary>
+        public bool VerificationPassed { get; set; }
     }
 
     /// <summary>

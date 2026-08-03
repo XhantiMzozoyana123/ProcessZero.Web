@@ -490,6 +490,8 @@ namespace ProcessZero.Web.Controllers
                 request.OrderId, userId);
 
             // Use LLM to verify the payment proof image
+            // Credits are ONLY added when verification is explicitly successful.
+            // If verification fails, the user can retry uploading a valid image.
             bool isVerified = false;
             string verificationMessage = "";
             
@@ -504,71 +506,94 @@ namespace ProcessZero.Web.Controllers
                     paymentOrder.Currency);
                 
                 _logger.LogInformation("LLM verification result for order {OrderId}: {IsVerified}", request.OrderId, isVerified);
-
-                if (isVerified)
-                {
-                    verificationMessage = "Payment proof verified by AI. Credits have been added to your wallet.";
-                    _logger.LogInformation("LLM verified payment proof for order {OrderId}", request.OrderId);
-                }
-                else
-                {
-                    verificationMessage = "Payment proof submitted. Our security team will investigate and verify the payment manually. Credits have been added pending verification.";
-                    _logger.LogWarning("LLM flagged payment proof as potentially invalid for order {OrderId}", request.OrderId);
-                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "LLM verification failed for order {OrderId}, proceeding with manual review", request.OrderId);
-                verificationMessage = "Payment proof submitted. Our security team will investigate and verify the payment manually. Credits have been added pending verification.";
+                _logger.LogError(ex, "LLM verification encountered an error for order {OrderId} - credits will not be added", request.OrderId);
+                isVerified = false;
             }
 
-            // Always add credits regardless of LLM verification
-            // If verification fails, flag for manual review
-            var packages = await _walletService.GetAvailablePackagesAsync();
-            var package = packages.FirstOrDefault(p => p.Id == paymentOrder.CreditPackageId);
-            
-            if (package != null)
+            // Build the user-friendly message about what the image should contain.
+            // This is used both when AI verification fails and when the LLM service errors out.
+            var imageRequirements = $"The image you uploaded doesn't appear to be a valid payment confirmation screenshot. Please ensure your screenshot includes:\n" +
+                $"• The exact payment amount of {paymentOrder.Amount:N2} {paymentOrder.Currency}\n" +
+                $"• Your bank's payment confirmation or success screen\n" +
+                $"• The date and time of the transaction\n" +
+                $"• The recipient/beneficiary name\n\n" +
+                $"Please capture and upload a clearer screenshot of your completed payment, then try again.";
+
+            if (isVerified)
             {
-                var purchaseResult = await _walletService.PurchaseCreditsAsync(
-                    userId, 
-                    new PurchaseCreditsRequestDto
+                // Verification passed — add credits and complete the order
+                var packages = await _walletService.GetAvailablePackagesAsync();
+                var package = packages.FirstOrDefault(p => p.Id == paymentOrder.CreditPackageId);
+                
+                if (package != null)
+                {
+                    var purchaseResult = await _walletService.PurchaseCreditsAsync(
+                        userId, 
+                        new PurchaseCreditsRequestDto
+                        {
+                            CreditPackageId = package.Id,
+                            PaymentMethod = "PayShap",
+                            PaymentReference = paymentOrder.OrderId
+                        }, 
+                        cancellationToken);
+
+                    if (purchaseResult.Success)
                     {
-                        CreditPackageId = package.Id,
-                        PaymentMethod = "PayShap",
-                        PaymentReference = paymentOrder.OrderId
-                    }, 
-                    cancellationToken);
+                        paymentOrder.Status = "Completed";
+                        paymentOrder.VerifiedAt = DateTime.UtcNow;
+                        paymentOrder.AdminNotes = "AI verification passed - credits added successfully";
+                        
+                        await _context.SaveChangesAsync(cancellationToken);
 
-                if (purchaseResult.Success)
-                {
-                    paymentOrder.Status = isVerified ? "Completed" : "UnderReview";
-                    paymentOrder.VerifiedAt = DateTime.UtcNow;
-                    paymentOrder.AdminNotes = isVerified 
-                        ? "AI verification passed" 
-                        : "AI verification flagged for manual review - credits added pending security verification";
-                    
-                    await _context.SaveChangesAsync(cancellationToken);
+                        _logger.LogInformation(
+                            "Credits added for order {OrderId}, user {UserId}, status: {Status}",
+                            request.OrderId, userId, paymentOrder.Status);
 
-                    _logger.LogInformation(
-                        "Credits added for order {OrderId}, user {UserId}, status: {Status}",
-                        request.OrderId, userId, paymentOrder.Status);
+                        verificationMessage = "Payment proof verified successfully. Credits have been added to your wallet.";
+                    }
+                    else
+                    {
+                        _logger.LogError(
+                            "Failed to credit wallet for order {OrderId}: {Message}",
+                            request.OrderId, purchaseResult.Message);
+                        return StatusCode(500, new { message = "Payment proof submitted but failed to add credits.", detail = purchaseResult.Message });
+                    }
                 }
-                else
+
+                return Ok(new SubmitPaymentProofResponse
                 {
-                    _logger.LogError(
-                        "Failed to credit wallet for order {OrderId}: {Message}",
-                        request.OrderId, purchaseResult.Message);
-                    return StatusCode(500, new { message = "Payment proof submitted but failed to add credits.", detail = purchaseResult.Message });
-                }
+                    Success = true,
+                    Message = verificationMessage,
+                    OrderId = request.OrderId,
+                    Status = paymentOrder.Status,
+                    VerificationPassed = true
+                });
             }
-
-            return Ok(new SubmitPaymentProofResponse
+            else
             {
-                Success = true,
-                Message = verificationMessage,
-                OrderId = request.OrderId,
-                Status = paymentOrder.Status
-            });
+                // Verification failed or errored — do NOT add credits.
+                // Reset the order back to "Pending" so the user can retry uploading a valid screenshot.
+                paymentOrder.Status = "Pending";
+                paymentOrder.AdminNotes = $"AI verification did not pass — image appears invalid or incomplete. User may retry uploading a valid payment screenshot.";
+                
+                await _context.SaveChangesAsync(cancellationToken);
+
+                _logger.LogWarning(
+                    "AI verification failed for order {OrderId}, user {UserId}. Credits not added. Order reset to Pending for retry.",
+                    request.OrderId, userId);
+
+                return Ok(new SubmitPaymentProofResponse
+                {
+                    Success = true,
+                    Message = imageRequirements,
+                    OrderId = request.OrderId,
+                    Status = "Pending",
+                    VerificationPassed = false
+                });
+            }
         }
 
         [HttpPost("payshap/verify")]

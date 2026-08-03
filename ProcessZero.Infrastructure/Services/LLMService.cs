@@ -132,9 +132,9 @@ Respond with ONLY 'true' or 'false' - no other text.";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "LLM payment verification failed");
-                // Default to true on error to not block legitimate users
-                return true;
+                _logger.LogError(ex, "LLM payment verification failed - defaulting to verification failed");
+                // Default to false on error - credits must not be added unless verification is explicitly successful
+                return false;
             }
         }
     }
