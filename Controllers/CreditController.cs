@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using ProcessZero.Application.Constants;
 using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
 using ProcessZero.Infrastructure.Services;
@@ -26,8 +27,15 @@ namespace ProcessZero.Web.Controllers
         private readonly ILogger<CreditController> _logger;
         private readonly TimerServiceClient _timerService;
         private readonly ILLMService _llmService;
+        private readonly IEmailService _emailService;
 
-        public CreditController(IUserWalletService walletService, IConfiguration configuration, IPayPalService payPalService, IPayGateService payGateService, ApplicationDbContext context, ILogger<CreditController> logger, TimerServiceClient timerService, ILLMService llmService)
+        // Guards against sending a duplicate "credits run out" email on every poll/heartbeat.
+        // The entry is only added once a user actually runs out, and removed again once the
+        // user tops back up (so they are re-notified the next time their credits run out).
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _runOutNotifiedAt =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, DateTime>();
+
+        public CreditController(IUserWalletService walletService, IConfiguration configuration, IPayPalService payPalService, IPayGateService payGateService, ApplicationDbContext context, ILogger<CreditController> logger, TimerServiceClient timerService, ILLMService llmService, IEmailService emailService)
         {
             _walletService = walletService;
             _configuration = configuration;
@@ -37,10 +45,49 @@ namespace ProcessZero.Web.Controllers
             _logger = logger;
             _timerService = timerService;
             _llmService = llmService;
+            _emailService = emailService;
         }
 
         private string GetUserId() =>
             User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+        /// <summary>
+        /// When a user's credits run out (or the timer is blocked because their balance
+        /// reached zero), send them an email (via NoticeConstant + IEmailService) telling
+        /// them their credits have run out, that they need to top up, and that their
+        /// account will be deleted if it stays inactive for 14 days or more.
+        /// A per-user guard prevents duplicate emails on every heartbeat/poll.
+        /// </summary>
+        private async Task NotifyCreditsRunOutIfNeededAsync(string userId, bool hasRunOut, decimal balance)
+        {
+            if (!hasRunOut)
+            {
+                // User still has credits (or topped back up) - allow a future notification.
+                _runOutNotifiedAt.TryRemove(userId, out _);
+                return;
+            }
+
+            // Already notified for this run-out period - don't spam every minute.
+            if (_runOutNotifiedAt.ContainsKey(userId))
+                return;
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || string.IsNullOrWhiteSpace(user.Email))
+                return;
+
+            try
+            {
+                var name = !string.IsNullOrWhiteSpace(user.UserName) ? user.UserName : user.Email;
+                var notice = NoticeConstant.NotifyCreditsRunOut(name, user.Email, balance);
+                await _emailService.SendEmailAsync(notice);
+                _runOutNotifiedAt[userId] = DateTime.UtcNow;
+                _logger.LogInformation("Notified user {UserId} that their credits have run out (balance {Balance})", userId, balance);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to notify user {UserId} about depleted credits", userId);
+            }
+        }
 
         [HttpGet("wallet")]
         [AllowTimerService]  // Accepts either JWT or X-Timer-Api-Key header
@@ -115,9 +162,19 @@ namespace ProcessZero.Web.Controllers
             if (request == null) return BadRequest("Consume request is required.");
 
             var result = await _walletService.ConsumeCreditsAsync(userId, request);
-            
+
             if (!result.Success)
+            {
+                // Insufficient credits - the user has run out. Notify them so they can top up.
+                await NotifyCreditsRunOutIfNeededAsync(userId, true, result.NewBalance);
                 return BadRequest(result);
+            }
+
+            // If this consumption is what brought the balance to (or below) zero, notify as well.
+            if (result.NewBalance <= 0)
+            {
+                await NotifyCreditsRunOutIfNeededAsync(userId, true, result.NewBalance);
+            }
 
             return Ok(result);
         }
@@ -135,6 +192,11 @@ namespace ProcessZero.Web.Controllers
             if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
 
             var result = await _walletService.CheckCreditBalanceAsync(userId, requiredCredits);
+
+            // The timer service blocks a user when their balance is zero (credits have run
+            // out / timer has run out). Notify the user (their registered email) so they can top up.
+            await NotifyCreditsRunOutIfNeededAsync(userId, result.CreditBalance <= 0, result.CreditBalance);
+
             return Ok(result);
         }
 

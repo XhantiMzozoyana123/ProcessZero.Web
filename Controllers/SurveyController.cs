@@ -267,6 +267,14 @@ namespace ProcessZero.Web.Controllers
             {
                 return BadRequest("Malformed JSON in request body.");
             }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
+            {
+                return StatusCode(500, $"Database error: {dbEx.InnerException?.Message ?? dbEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal error: {ex.Message}");
+            }
         }
 
         /// <summary>

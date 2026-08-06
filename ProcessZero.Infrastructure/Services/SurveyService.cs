@@ -77,6 +77,7 @@ namespace ProcessZero.Infrastructure.Services
                 Title = survey.Title,
                 Description = survey.Description,
                 Status = survey.Status,
+                BookingLink = survey.BookingLink,
                 Questions = questions.Select(MapToQuestionDto).ToList()
             };
         }
@@ -147,7 +148,8 @@ namespace ProcessZero.Infrastructure.Services
                     Company = company,
                     Job = job,
                     Industry = industry,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
                 _context.SurveyRespondents.Add(respondent);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -160,7 +162,8 @@ namespace ProcessZero.Infrastructure.Services
                 SurveyRespondentId = respondent.Id,
                 Respondent = respondent,
                 SubmittedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             _context.SurveyResponses.Add(response);
@@ -174,7 +177,8 @@ namespace ProcessZero.Infrastructure.Services
                     SurveyResponseId = response.Id,
                     SurveyQuestionId = questions[i].Id,
                     AnswerText = submission.Answers[i]?.Trim() ?? string.Empty,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 });
             }
             await _context.SaveChangesAsync(cancellationToken);
@@ -253,8 +257,10 @@ namespace ProcessZero.Infrastructure.Services
                 Title = survey.Title,
                 Description = survey.Description,
                 Status = survey.Status ?? "Active",
+                BookingLink = survey.BookingLink,
                 UploadedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
             };
 
             _context.Surveys.Add(entity);
@@ -273,7 +279,8 @@ namespace ProcessZero.Infrastructure.Services
                     Category = QuestionCategory.Contact,
                     IsRequired = contact.IsRequired,
                     Type = SurveyQuestionType.OpenEnded,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 });
             }
             await _context.SaveChangesAsync(cancellationToken);
@@ -290,7 +297,8 @@ namespace ProcessZero.Infrastructure.Services
                     Category = QuestionCategory.Business,
                     IsRequired = q.IsRequired,
                     Type = q.Type,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
                 _context.SurveyQuestions.Add(question);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -305,7 +313,8 @@ namespace ProcessZero.Infrastructure.Services
                             SurveyQuestionId = question.Id,
                             Text = opt.text,
                             Order = opt.idx,
-                            CreatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
                         });
                     }
                     await _context.SaveChangesAsync(cancellationToken);
@@ -332,13 +341,33 @@ namespace ProcessZero.Infrastructure.Services
             entity.Title = survey.Title;
             entity.Description = survey.Description;
             entity.Status = survey.Status ?? entity.Status;
+            entity.BookingLink = survey.BookingLink;
             entity.UploadedAt = DateTime.UtcNow;
             entity.UpdatedAt = DateTime.UtcNow;
 
-            // Remove existing questions and re-add (cascade deletes answers too)
+            // Remove existing questions and re-add.
+            // NOTE: The SurveyAnswer → SurveyQuestion FK uses OnDelete(DeleteBehavior.Restrict),
+            // so we must explicitly remove SurveyAnswer rows that reference the questions being
+            // deleted. Otherwise the database rejects the question DELETE with a FK constraint
+            // violation, which throws a DbUpdateException (surfacing as HTTP 500).
             var existingQuestions = await _context.SurveyQuestions
                 .Where(q => q.SurveyId == entity.Id)
                 .ToListAsync(cancellationToken);
+
+            var questionIds = existingQuestions.Select(q => q.Id).ToList();
+            if (questionIds.Any())
+            {
+                var existingAnswers = await _context.SurveyAnswers
+                    .Where(a => questionIds.Contains(a.SurveyQuestionId))
+                    .ToListAsync(cancellationToken);
+
+                if (existingAnswers.Any())
+                {
+                    _context.SurveyAnswers.RemoveRange(existingAnswers);
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+            }
+
             _context.SurveyQuestions.RemoveRange(existingQuestions);
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -355,7 +384,8 @@ namespace ProcessZero.Infrastructure.Services
                     Category = QuestionCategory.Contact,
                     IsRequired = contact.IsRequired,
                     Type = SurveyQuestionType.OpenEnded,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 });
             }
             await _context.SaveChangesAsync(cancellationToken);
@@ -372,7 +402,8 @@ namespace ProcessZero.Infrastructure.Services
                     Category = QuestionCategory.Business,
                     IsRequired = q.IsRequired,
                     Type = q.Type,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
                 _context.SurveyQuestions.Add(question);
                 await _context.SaveChangesAsync(cancellationToken);
@@ -387,7 +418,8 @@ namespace ProcessZero.Infrastructure.Services
                             SurveyQuestionId = question.Id,
                             Text = opt.text,
                             Order = opt.idx,
-                            CreatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
                         });
                     }
                     await _context.SaveChangesAsync(cancellationToken);
@@ -433,6 +465,7 @@ namespace ProcessZero.Infrastructure.Services
                 Title = survey.Title,
                 Description = survey.Description,
                 Status = survey.Status,
+                BookingLink = survey.BookingLink,
                 Questions = questions
                     .Where(q => q.Category == QuestionCategory.Business)
                     .Select(MapToQuestionDto)

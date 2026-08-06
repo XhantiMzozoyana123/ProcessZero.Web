@@ -137,7 +137,7 @@ namespace ProcessZero.Infrastructure.Services
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
                 claims: baseClaims,
-                expires: DateTime.UtcNow.AddMinutes(30),
+                expires: DateTime.UtcNow.AddHours(8), // 8 hours so form filling doesn't timeout
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
@@ -274,6 +274,25 @@ namespace ProcessZero.Infrastructure.Services
 
             var errors = string.Join(", ", result.Errors.Select(e => e.Description));
             throw new Exception(errors);
+        }
+
+        public async Task<string> RefreshTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                throw new ArgumentException("Token is required.", nameof(token));
+
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+            var userId = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrWhiteSpace(userId))
+                throw new InvalidOperationException("Invalid token.");
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new InvalidOperationException("User not found.");
+
+            return await GenerateJwtTokenAsync(user);
         }
 
         public async Task<string> GenerateImpersonationTokenAsync(string userId)

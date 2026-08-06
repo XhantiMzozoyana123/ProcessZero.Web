@@ -190,6 +190,62 @@ namespace ProcessZero.Web.Controllers
         }
 
         /// <summary>
+        /// Refreshes the JWT token by validating the current token and issuing a new one.
+        /// Accepts a payload with the current token string.
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("refresh")]
+        public async Task<IActionResult> RefreshToken([FromBody] System.Text.Json.JsonElement body)
+        {
+            try
+            {
+                if (body.ValueKind == System.Text.Json.JsonValueKind.Null || body.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+                    return BadRequest(new { error = "Request body is required." });
+
+                // Try to extract token from the body (case-insensitive)
+                string? token = null;
+                foreach (var prop in body.EnumerateObject())
+                {
+                    if (string.Equals(prop.Name, "token", StringComparison.OrdinalIgnoreCase))
+                    {
+                        token = prop.Value.GetString();
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(token))
+                    return BadRequest(new { error = "Token is required." });
+
+                // Decode the existing token to find the user
+                var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+                var jwtToken = handler.ReadJwtToken(token);
+                var userId = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+
+                if (string.IsNullOrWhiteSpace(userId))
+                    return Unauthorized(new { error = "Invalid token." });
+
+                var user = await _authService.GetUserByIdAsync(userId);
+                if (user == null)
+                    return Unauthorized(new { error = "User not found." });
+
+                // Use the auth service to verify and regenerate
+                try
+                {
+                    var newToken = await _authService.RefreshTokenAsync(token);
+                    return Ok(new { token = newToken });
+                }
+                catch
+                {
+                    return Unauthorized(new { error = "Token refresh failed." });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Returns details about the currently authenticated user. This endpoint requires
         /// authentication and will use the claim extracted by <see cref="GetUserId"/>.
         /// The returned object is a <see cref="UserDto"/> provided by the service.

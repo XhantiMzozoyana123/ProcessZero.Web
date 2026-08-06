@@ -39,6 +39,12 @@ namespace ProcessZero.Domain.Entities
         /// </summary>
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
 
+        /// <summary>
+        /// Optional URL for booking a free demo call (e.g. Cal.com link).
+        /// When set, the public survey thank-you page shows a booking CTA.
+        /// </summary>
+        public string? BookingLink { get; set; }
+
         // Navigation properties
         public ICollection<SurveyQuestion> Questions { get; set; } = new List<SurveyQuestion>();
         public ICollection<SurveyRespondent> Respondents { get; set; } = new List<SurveyRespondent>();

@@ -109,6 +109,11 @@ namespace ProcessZero.Application.Dtos
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = "Active";
         /// <summary>
+        /// Optional URL for booking a free demo call (e.g. Cal.com link).
+        /// When set, the public survey thank-you page shows a booking CTA.
+        /// </summary>
+        public string? BookingLink { get; set; }
+        /// <summary>
         /// Business/pain point questions. Contact questions are automatically prepended by service.
         /// Each question is either MultipleChoice (has Options) or OpenEnded (free text),
         /// mirroring the assessment question model.
@@ -137,6 +142,11 @@ namespace ProcessZero.Application.Dtos
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        /// <summary>
+        /// Optional URL for booking a free demo call (e.g. Cal.com link).
+        /// When set, the public survey thank-you page shows a booking CTA.
+        /// </summary>
+        public string? BookingLink { get; set; }
         /// <summary>
         /// ALL questions including mandatory contact questions (0-6) and business questions (7+).
         /// Each item specifies its Type and Options so the UI can render MCQ vs open-ended.

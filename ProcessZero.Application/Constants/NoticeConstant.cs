@@ -995,6 +995,55 @@ namespace ProcessZero.Application.Constants
         }
 
         /// <summary>
+        /// Notify the user (the sales-rep account holder) that their credits have run out,
+        /// that they need to top up to continue, and that their account will be deleted if
+        /// it stays inactive on the app for 14 days or more.
+        /// </summary>
+        public static EmailDto NotifyCreditsRunOut(
+            string recipientName,
+            string recipientEmail,
+            decimal currentBalance = 0,
+            string? topUpUrl = null,
+            string? note = null)
+        {
+            var noteText = string.IsNullOrWhiteSpace(note)
+                ? string.Empty
+                : $@"<div class=""pz-panel-teal""><p><strong>Note:</strong> {System.Net.WebUtility.HtmlEncode(note)}</p></div>";
+
+            var balanceLine = currentBalance > 0
+                ? $"<p><strong>Current balance:</strong> {currentBalance} credits</p>"
+                : string.Empty;
+
+            var topUpSection = string.IsNullOrWhiteSpace(topUpUrl)
+                ? $@"<div class=""pz-panel-teal""><p>To regain access, please go to the <strong>Credits / Top Up</strong> section in your ProcessZero app and purchase a credit package, or contact our team.</p></div>"
+                : $@"<div style=""margin:20px 0;""><a href=""{System.Net.WebUtility.HtmlEncode(topUpUrl)}"" target=""_blank"" class=""pz-btn"">&#128176; Top Up Your Credits</a></div>";
+
+            var html = $@"
+<h2 style=""color:#c06c52;"">&#9888;&#65039; Your credits have run out</h2>
+<p>Hi {System.Net.WebUtility.HtmlEncode(recipientName)},</p>
+<p>Your ProcessZero credits have <strong>run out</strong>, so your active usage timer has been paused and access to the platform is currently blocked.</p>
+{balanceLine}
+<p>To continue using the app you will need to <strong>top up your credits</strong>.</p>
+{topUpSection}
+<div class=""pz-panel-coral"">
+  <p><strong>&#9203; Account Inactivity Notice:</strong> If you remain inactive on the app for <strong>14 days or more</strong>, your account will be <strong>deleted</strong>. Please log in and stay active to avoid losing your account.</p>
+</div>
+{noteText}
+<p>If you have any questions about topping up or your account, please contact our team.</p>
+<hr class=""pz-divider"">
+<p style=""color:#607078;font-size:14px;"">Regards,<br/><strong style=""color:#172121;"">ProcessZero Team</strong></p>";
+
+            return new EmailDto
+            {
+                Subject = "Action required: your ProcessZero credits have run out",
+                Body = BrandedWrapWithTemplate(html),
+                RecipientEmail = recipientEmail ?? string.Empty,
+                RecipientName = recipientName ?? string.Empty
+            };
+        }
+
+
+        /// <summary>
         /// Announce that a new product was added to the catalog.
         /// </summary>
         public static EmailDto NotifyProductCreated(

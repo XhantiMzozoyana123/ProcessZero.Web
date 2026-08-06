@@ -18,5 +18,6 @@ namespace ProcessZero.Application.Interfaces
         Task<string> ForgotPasswordAsync(string email);
         Task<string> ResetPasswordAsync(ResetPasswordDto model);
         Task<string> GenerateImpersonationTokenAsync(string userId);
+        Task<string> RefreshTokenAsync(string token);
     }
 }
