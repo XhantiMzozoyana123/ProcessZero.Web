@@ -117,7 +117,13 @@ namespace ProcessZero.Infrastructure.Services
                     UserId = m.UserId,
                     Contact = contact,
                     Product = product,
-                    Meeting = m
+                    Meeting = m,
+                    Budget = m.Budget,
+                    Commission = m.Commission,
+                    OpportunityStatus = m.OpportunityStatus,
+                    ContactName = m.ContactName,
+                    ContactEmail = m.ContactEmail,
+                    ContactCompany = m.ContactCompany
                 });
             }
 
@@ -164,7 +170,13 @@ namespace ProcessZero.Infrastructure.Services
                     UserId = m.UserId,
                     Contact = contact,
                     Product = product,
-                    Meeting = m
+                    Meeting = m,
+                    Budget = m.Budget,
+                    Commission = m.Commission,
+                    OpportunityStatus = m.OpportunityStatus,
+                    ContactName = m.ContactName,
+                    ContactEmail = m.ContactEmail,
+                    ContactCompany = m.ContactCompany
                 });
             }
 
@@ -184,7 +196,161 @@ namespace ProcessZero.Infrastructure.Services
                 UserId = meeting.UserId,
                 Contact = contact,
                 Product = product,
-                Meeting = meeting
+                Meeting = meeting,
+                Budget = meeting.Budget,
+                Commission = meeting.Commission,
+                OpportunityStatus = meeting.OpportunityStatus,
+                ContactName = meeting.ContactName,
+                ContactEmail = meeting.ContactEmail,
+                ContactCompany = meeting.ContactCompany
+            };
+        }
+
+        public async Task<List<MeetingDto>> GetAvailableOpportunitiesAsync()
+        {
+            var meetings = await _context.Meetings
+                .Where(m => m.OpportunityStatus == OpportunityStatus.Available)
+                .OrderByDescending(m => m.MeetingDate)
+                .ToListAsync();
+
+            var result = new List<MeetingDto>();
+            if (!meetings.Any()) return result;
+
+            var contactIds = meetings.Select(m => m.ClientId).Distinct().ToList();
+            var productIds = meetings.Select(m => m.ProductId).Distinct().ToList();
+
+            var contacts = await _context.Contacts.Where(c => contactIds.Contains(c.Id)).ToListAsync();
+            var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+
+            var contactsById = contacts.ToDictionary(c => c.Id);
+            var productsById = products.ToDictionary(p => p.Id);
+
+            foreach (var m in meetings)
+            {
+                contactsById.TryGetValue(m.ClientId, out var contact);
+                productsById.TryGetValue(m.ProductId, out var product);
+
+                result.Add(new MeetingDto
+                {
+                    UserId = m.UserId,
+                    Contact = contact,
+                    Product = product,
+                    Meeting = m,
+                    Budget = m.Budget,
+                    Commission = m.Commission,
+                    OpportunityStatus = m.OpportunityStatus,
+                    ContactName = m.ContactName,
+                    ContactEmail = m.ContactEmail,
+                    ContactCompany = m.ContactCompany
+                });
+            }
+
+            return result;
+        }
+
+        public async Task<List<MeetingDto>> GetMyOpportunitiesAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentNullException(nameof(userId));
+
+            var meetings = await _context.Meetings
+                .Where(x => x.UserId == userId && x.OpportunityStatus != OpportunityStatus.Available)
+                .OrderByDescending(m => m.MeetingDate)
+                .ToListAsync();
+
+            var result = new List<MeetingDto>();
+            if (!meetings.Any()) return result;
+
+            var contactIds = meetings.Select(m => m.ClientId).Distinct().ToList();
+            var productIds = meetings.Select(m => m.ProductId).Distinct().ToList();
+
+            var contacts = await _context.Contacts.Where(c => contactIds.Contains(c.Id)).ToListAsync();
+            var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+
+            var contactsById = contacts.ToDictionary(c => c.Id);
+            var productsById = products.ToDictionary(p => p.Id);
+
+            foreach (var m in meetings)
+            {
+                contactsById.TryGetValue(m.ClientId, out var contact);
+                productsById.TryGetValue(m.ProductId, out var product);
+
+                result.Add(new MeetingDto
+                {
+                    UserId = m.UserId,
+                    Contact = contact,
+                    Product = product,
+                    Meeting = m,
+                    Budget = m.Budget,
+                    Commission = m.Commission,
+                    OpportunityStatus = m.OpportunityStatus,
+                    ContactName = m.ContactName,
+                    ContactEmail = m.ContactEmail,
+                    ContactCompany = m.ContactCompany
+                });
+            }
+
+            return result;
+        }
+
+        public async Task<MeetingDto> ClaimOpportunityAsync(int id, string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentNullException(nameof(userId));
+
+            var meeting = await _context.Meetings.FindAsync(id);
+            if (meeting == null) throw new InvalidOperationException($"Opportunity with id {id} not found");
+
+            if (meeting.OpportunityStatus != OpportunityStatus.Available)
+                throw new InvalidOperationException("This opportunity is no longer available.");
+
+            meeting.UserId = userId;
+            meeting.OpportunityStatus = OpportunityStatus.Claimed;
+
+            _context.Meetings.Update(meeting);
+            await _context.SaveChangesAsync();
+
+            var contact = await _context.Contacts.FindAsync(meeting.ClientId);
+            var product = await _context.Products.FindAsync(meeting.ProductId);
+
+            return new MeetingDto
+            {
+                UserId = meeting.UserId,
+                Contact = contact,
+                Product = product,
+                Meeting = meeting,
+                Budget = meeting.Budget,
+                Commission = meeting.Commission,
+                OpportunityStatus = meeting.OpportunityStatus,
+                ContactName = meeting.ContactName,
+                ContactEmail = meeting.ContactEmail,
+                ContactCompany = meeting.ContactCompany
+            };
+        }
+
+        public async Task<MeetingDto> UpdateOpportunityStatusAsync(int id, OpportunityStatus status)
+        {
+            var meeting = await _context.Meetings.FindAsync(id);
+            if (meeting == null) throw new InvalidOperationException($"Opportunity with id {id} not found");
+
+            meeting.OpportunityStatus = status;
+
+            _context.Meetings.Update(meeting);
+            await _context.SaveChangesAsync();
+
+            var contact = await _context.Contacts.FindAsync(meeting.ClientId);
+            var product = await _context.Products.FindAsync(meeting.ProductId);
+
+            return new MeetingDto
+            {
+                UserId = meeting.UserId,
+                Contact = contact,
+                Product = product,
+                Meeting = meeting,
+                Budget = meeting.Budget,
+                Commission = meeting.Commission,
+                OpportunityStatus = meeting.OpportunityStatus,
+                ContactName = meeting.ContactName,
+                ContactEmail = meeting.ContactEmail,
+                ContactCompany = meeting.ContactCompany
             };
         }
 

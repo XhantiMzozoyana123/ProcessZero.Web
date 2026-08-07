@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ProcessZero.Application.Dtos;
 using ProcessZero.Application.Interfaces;
+using ProcessZero.Domain.Entities;
 using System.Security.Claims;
 
 namespace ProcessZero.Web.Controllers
@@ -147,6 +148,71 @@ namespace ProcessZero.Web.Controllers
         {
             await _meetingService.DeleteMeetingAsync(id, notes ?? string.Empty);
             return NoContent();
+        }
+
+        /// <summary>
+        /// GET: api/meeting/opportunities
+        /// Returns all available opportunities (admin view).
+        /// </summary>
+        [HttpGet("opportunities")]
+        public async Task<IActionResult> GetAvailableOpportunities()
+        {
+            var opportunities = await _meetingService.GetAvailableOpportunitiesAsync();
+            return Ok(opportunities);
+        }
+
+        /// <summary>
+        /// GET: api/meeting/opportunities/my
+        /// Returns opportunities claimed by the authenticated user.
+        /// </summary>
+        [HttpGet("opportunities/my")]
+        public async Task<IActionResult> GetMyOpportunities()
+        {
+            var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            var opportunities = await _meetingService.GetMyOpportunitiesAsync(userId);
+            return Ok(opportunities);
+        }
+
+        /// <summary>
+        /// POST: api/meeting/{id}/claim
+        /// Claims an available opportunity for the authenticated user.
+        /// </summary>
+        [HttpPost("{id:int}/claim")]
+        public async Task<IActionResult> ClaimOpportunity(int id)
+        {
+            var userId = GetUserId();
+            if (string.IsNullOrWhiteSpace(userId)) return Unauthorized();
+
+            try
+            {
+                var result = await _meetingService.ClaimOpportunityAsync(id, userId);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// PUT: api/meeting/{id}/status
+        /// Updates the opportunity status (admin only).
+        /// </summary>
+        [HttpPut("{id:int}/status")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateOpportunityStatus(int id, [FromBody] OpportunityStatus status)
+        {
+            try
+            {
+                var result = await _meetingService.UpdateOpportunityStatusAsync(id, status);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
         }
     }
 }

@@ -14,5 +14,13 @@ namespace ProcessZero.Application.Dtos
         public Product Product { get; set; } = new Product(); // Select the product we are selling to the client by using ProductService getbyId
 
         public Meeting Meeting { get; set; } = new Meeting();
+
+        // ── Opportunity fields (denormalized for display) ──────────────────
+        public decimal? Budget { get; set; }
+        public decimal? Commission { get; set; }
+        public OpportunityStatus? OpportunityStatus { get; set; }
+        public string? ContactName { get; set; }
+        public string? ContactEmail { get; set; }
+        public string? ContactCompany { get; set; }
     }
 }

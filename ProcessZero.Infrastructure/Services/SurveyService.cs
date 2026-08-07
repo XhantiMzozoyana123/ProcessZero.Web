@@ -185,10 +185,10 @@ namespace ProcessZero.Infrastructure.Services
 
             try
             {
-                var qualifies = await ValidateAndQualifyRespondentAsync(survey, questions, submission, respondent, cancellationToken);
-                if (qualifies)
+                var intent = await ValidateAndQualifyRespondentAsync(survey, questions, submission, respondent, cancellationToken);
+                if (intent.HasValue)
                 {
-                    await AddToLeadLakeAsync(respondent, cancellationToken);
+                    await AddToLeadLakeAsync(respondent, intent.Value, cancellationToken);
                 }
             }
             catch
@@ -601,7 +601,7 @@ namespace ProcessZero.Infrastructure.Services
             };
         }
 
-        private async Task<bool> ValidateAndQualifyRespondentAsync(
+        private async Task<LeadIntent?> ValidateAndQualifyRespondentAsync(
             Survey survey,
             List<SurveyQuestion> questions,
             SurveyResponseSubmissionDto submission,
@@ -609,7 +609,7 @@ namespace ProcessZero.Infrastructure.Services
             CancellationToken cancellationToken)
         {
             var analysisPrompt = $@"
-                Analyze the following survey responses to determine if this person has real, actionable pain points that indicate high-ticket business problems:
+                Analyze the following survey responses and determine the purchase intent level of this business.
 
                 Survey Title: {survey.Title}
                 Survey Description: {survey.Description}
@@ -629,27 +629,34 @@ namespace ProcessZero.Infrastructure.Services
             }
 
             analysisPrompt += @"
-                Based on the survey responses, determine if this person represents a real, high-ticket pain point that could lead to a B2B product sale.
+                Based on the survey responses, classify the purchase intent as one of:
+                - HIGH: Clear pain points, urgent need, budget indicated, decision-maker
+                - MEDIUM: Some interest, mild pain points, exploring options
+                - LOW: Vague responses, no clear need, low engagement
 
-                Respond with ONLY one word:
-                - 'QUALIFY' if they show clear pain points and business problems worth pursuing
-                - 'REJECT' if the responses are superficial, generic, or don't indicate real problems
-
+                Respond with ONLY one word: HIGH, MEDIUM, or LOW
                 Do not include any explanation, just the word.";
 
             try
             {
                 var llmResponse = await _llmService.GenerateTextAsync(analysisPrompt);
                 var cleanResponse = llmResponse?.Trim().ToUpperInvariant() ?? string.Empty;
-                return cleanResponse.Contains("QUALIFY");
+
+                return cleanResponse switch
+                {
+                    "HIGH" => LeadIntent.High,
+                    "MEDIUM" => LeadIntent.Medium,
+                    "LOW" => LeadIntent.Low,
+                    _ => LeadIntent.Medium
+                };
             }
             catch
             {
-                return false;
+                return LeadIntent.Medium;
             }
         }
 
-        private async Task AddToLeadLakeAsync(SurveyRespondent respondent, CancellationToken cancellationToken)
+        private async Task AddToLeadLakeAsync(SurveyRespondent respondent, LeadIntent intent, CancellationToken cancellationToken)
         {
             var existingLead = await _context.LeadLakes
                 .Where(l => l.Email == respondent.Email)
@@ -671,7 +678,7 @@ namespace ProcessZero.Infrastructure.Services
                 Job = respondent.Job,
                 Location = string.Empty,
                 Industry = industryEnum,
-                Intent = LeadIntent.High,
+                Intent = intent,
                 CreatedAt = DateTime.UtcNow
             });
 

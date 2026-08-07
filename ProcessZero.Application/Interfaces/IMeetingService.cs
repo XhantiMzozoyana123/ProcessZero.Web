@@ -1,4 +1,5 @@
 ﻿using ProcessZero.Application.Dtos;
+using ProcessZero.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,5 +26,14 @@ namespace ProcessZero.Application.Interfaces
         Task UpdateMeetingAsync(MeetingDto meetingDto, string notes);
 
         Task DeleteMeetingAsync(int id, string notes);
+
+        // ── Opportunity Methods ──────────────────────────────────────────
+        Task<List<MeetingDto>> GetAvailableOpportunitiesAsync();
+
+        Task<List<MeetingDto>> GetMyOpportunitiesAsync(string userId);
+
+        Task<MeetingDto> ClaimOpportunityAsync(int id, string userId);
+
+        Task<MeetingDto> UpdateOpportunityStatusAsync(int id, OpportunityStatus status);
     }
 }
