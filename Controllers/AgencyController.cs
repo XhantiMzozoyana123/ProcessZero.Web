@@ -222,7 +222,7 @@ namespace ProcessZero.Web.Controllers
                     d.Id,
                     d.AgencyProfileId,
                     d.ContactId,
-                    ContactName = d.Contact.Name,
+                    ContactName = d.Contact != null ? d.Contact.Name : null,
                     d.Title,
                     d.Amount,
                     d.Stage,

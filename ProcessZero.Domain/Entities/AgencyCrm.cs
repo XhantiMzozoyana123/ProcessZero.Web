@@ -74,7 +74,7 @@ namespace ProcessZero.Domain.Entities
 
         public AgencyProfile AgencyProfile { get; set; } = null!;
 
-        [Required, StringLength(450)]
+        [Required]
         public int ContactId { get; set; }
 
         public AgencyContact Contact { get; set; } = null!;
