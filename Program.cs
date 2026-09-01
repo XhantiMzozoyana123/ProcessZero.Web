@@ -197,6 +197,7 @@ builder.Services.AddHttpContextAccessor();
 // APPLICATION SERVICES
 // -----------------------------
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<IKpiService, KpiService>();
 builder.Services.AddScoped<IKpiPolicyService, KpiPolicyService>();
 builder.Services.AddScoped<IMeetingService, MeetingService>();
@@ -403,6 +404,10 @@ async Task SeedAdminUser(
 
     if (!await roleManager.RoleExistsAsync("Admin"))
         await roleManager.CreateAsync(new IdentityRole("Admin"));
+
+    // Seed the "Agency" role used for dedicated agency login accounts.
+    if (!await roleManager.RoleExistsAsync("Agency"))
+        await roleManager.CreateAsync(new IdentityRole("Agency"));
 
     var user = await userManager.FindByEmailAsync(email);
 

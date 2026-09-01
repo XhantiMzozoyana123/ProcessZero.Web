@@ -1,10 +1,26 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 using ProcessZero.Domain.Entities;
 
 namespace ProcessZero.Domain
 {
+    /// <summary>
+    /// Design-time factory so `dotnet ef migrations add` works without starting
+    /// the full Web host (which attempts live DB connections at startup).
+    /// </summary>
+    public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
+    {
+        public ApplicationDbContext CreateDbContext(string[] args)
+        {
+            var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+            optionsBuilder.UseMySql("Server=localhost;Database=design_time;User=root;Password=;",
+                new MySqlServerVersion(new Version(8, 0, 36)));
+            return new ApplicationDbContext(optionsBuilder.Options);
+        }
+    }
+
     public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
@@ -516,6 +532,104 @@ namespace ProcessZero.Domain
                     .HasForeignKey(p => p.CreditPackageId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
+
+            // ──────────────────────────────────────────────────────────
+            // Agency profiles & Agency CRM
+            // ──────────────────────────────────────────────────────────
+
+            modelBuilder.Entity<AgencyProfile>(e =>
+            {
+                e.Property(a => a.Name).HasMaxLength(150);
+                e.Property(a => a.Description).HasMaxLength(2000);
+                e.Property(a => a.LinkedUserId).HasMaxLength(450);
+
+                e.HasIndex(a => a.LinkedUserId).IsUnique().HasDatabaseName("IX_AgencyProfiles_LinkedUserId");
+
+                e.HasOne<ApplicationUser>()
+                    .WithMany()
+                    .HasForeignKey(a => a.LinkedUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<AgencyManager>(e =>
+            {
+                e.Property(m => m.UserId).HasMaxLength(450);
+
+                e.HasIndex(m => new { m.AgencyProfileId, m.UserId }).IsUnique().HasDatabaseName("IX_AgencyManagers_Agency_UserId");
+                e.HasIndex(m => m.UserId).HasDatabaseName("IX_AgencyManagers_UserId");
+
+                e.HasOne(m => m.AgencyProfile)
+                    .WithMany(a => a.Managers)
+                    .HasForeignKey(m => m.AgencyProfileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne<ApplicationUser>()
+                    .WithMany()
+                    .HasForeignKey(m => m.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<AgencyContact>(e =>
+            {
+                e.Property(c => c.Name).HasMaxLength(200);
+                e.Property(c => c.Company).HasMaxLength(200);
+                e.Property(c => c.Email).HasMaxLength(256);
+                e.Property(c => c.Phone).HasMaxLength(50);
+                e.Property(c => c.Position).HasMaxLength(150);
+                e.Property(c => c.Notes).HasMaxLength(2000);
+
+                e.HasIndex(c => c.AgencyProfileId).HasDatabaseName("IX_AgencyContacts_AgencyProfileId");
+
+                e.HasOne(c => c.AgencyProfile)
+                    .WithMany()
+                    .HasForeignKey(c => c.AgencyProfileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<AgencyDeal>(e =>
+            {
+                e.Property(d => d.Title).HasMaxLength(200);
+                e.Property(d => d.Stage).HasMaxLength(50);
+                e.Property(d => d.Notes).HasMaxLength(2000);
+                e.Property(d => d.CreatedByUserId).HasMaxLength(450);
+
+                e.HasIndex(d => new { d.AgencyProfileId, d.Stage }).HasDatabaseName("IX_AgencyDeals_Agency_Stage");
+
+                e.HasOne(d => d.AgencyProfile)
+                    .WithMany()
+                    .HasForeignKey(d => d.AgencyProfileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(d => d.Contact)
+                    .WithMany(c => c.Deals)
+                    .HasForeignKey(d => d.ContactId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<AgencyActivity>(e =>
+            {
+                e.Property(a => a.Type).HasMaxLength(50);
+                e.Property(a => a.Subject).HasMaxLength(200);
+                e.Property(a => a.Description).HasMaxLength(4000);
+                e.Property(a => a.CreatedByUserId).HasMaxLength(450);
+
+                e.HasIndex(a => a.AgencyProfileId).HasDatabaseName("IX_AgencyActivities_AgencyProfileId");
+
+                e.HasOne(a => a.AgencyProfile)
+                    .WithMany()
+                    .HasForeignKey(a => a.AgencyProfileId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(a => a.Contact)
+                    .WithMany(c => c.Activities)
+                    .HasForeignKey(a => a.ContactId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                e.HasOne(a => a.Deal)
+                    .WithMany(d => d.Activities)
+                    .HasForeignKey(a => a.DealId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
         }
 
         public DbSet<KPI> KPIs { get; set; }
@@ -561,5 +675,12 @@ namespace ProcessZero.Domain
         // Session tracking for credit consumption
         public DbSet<UserSession> UserSessions { get; set; }
         public DbSet<ConsumptionConfig> ConsumptionConfigs { get; set; }
+
+        // Agency profiles & Agency CRM
+        public DbSet<AgencyProfile> AgencyProfiles { get; set; }
+        public DbSet<AgencyManager> AgencyManagers { get; set; }
+        public DbSet<AgencyContact> AgencyContacts { get; set; }
+        public DbSet<AgencyDeal> AgencyDeals { get; set; }
+        public DbSet<AgencyActivity> AgencyActivities { get; set; }
     }
 }
